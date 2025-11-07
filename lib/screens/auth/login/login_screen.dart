@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:form_builder_validators/form_builder_validators.dart';
+import 'package:quit_habit/screens/auth/login/forgot_password/forgot_password_screen.dart';
 import 'package:quit_habit/screens/auth/register/register_screen.dart';
 import 'package:quit_habit/utils/app_colors.dart';
 
@@ -378,7 +379,13 @@ class _LoginScreenState extends State<LoginScreen> {
                           // Forgot Password
                           TextButton(
                             onPressed: () {
-                              // Handle forgot password
+                              FocusScope.of(context).unfocus();
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const ForgotPasswordScreen(),
+                                ),
+                              );
                             },
                             style: TextButton.styleFrom(
                               padding: EdgeInsets.zero,
