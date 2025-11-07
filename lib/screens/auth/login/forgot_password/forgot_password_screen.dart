@@ -21,9 +21,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         _isLoading = true;
       });
 
-      // Simulate API call
-      await Future.delayed(const Duration(seconds: 2));
-
       setState(() {
         _isLoading = false;
         _emailSent = true;
