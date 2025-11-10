@@ -1,5 +1,3 @@
-// lib/screens/navbar/tools/breathing/breathing_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:quit_habit/utils/app_colors.dart';
 
@@ -59,43 +57,60 @@ class _BreathingScreenState extends State<BreathingScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // 1. Breathing Circle
-              Container(
-                width: 260,
-                height: 260,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      AppColors.lightPrimary.withOpacity(0.05),
-                      AppColors.lightBackground,
-                    ],
-                    stops: const [0.5, 1.0],
+              // 1. Breathing Circle (Now a Stack)
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  // New Outer, larger, more transparent circle (drawn first = "underneath")
+                  Container(
+                    width: 300,
+                    height: 300,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.lightPrimary.withAlpha(
+                        10,
+                      ), // More transparent
+                    ),
                   ),
-                ),
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        _currentCount,
-                        style: theme.textTheme.displayLarge?.copyWith(
-                          fontSize: 96,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.lightPrimary,
-                        ),
+                  // Original Inner Circle
+                  Container(
+                    width: 260,
+                    height: 260,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          AppColors.lightPrimary.withAlpha(13),
+                          AppColors.lightBackground,
+                        ],
+                        stops: const [0.5, 1.0],
                       ),
-                      Text(
-                        _currentState,
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          color: AppColors.lightPrimary,
-                          fontWeight: FontWeight.w500,
-                          fontSize: 20,
-                        ),
+                    ),
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            _currentCount,
+                            style: theme.textTheme.displayLarge?.copyWith(
+                              fontSize: 96,
+                              fontWeight: FontWeight.w300,
+                              color: AppColors.lightPrimary,
+                            ),
+                          ),
+                          Text(
+                            _currentState,
+                            style: theme.textTheme.headlineSmall?.copyWith(
+                              color: AppColors.lightPrimary,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 20,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
+                ],
               ),
 
               const SizedBox(height: 48),
@@ -107,14 +122,14 @@ class _BreathingScreenState extends State<BreathingScreen> {
                   vertical: 14,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.lightPrimary.withOpacity(0.08),
+                  color: AppColors.lightPrimary.withAlpha(20),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   'Follow the breathing pattern to calm your mind and reduce cravings',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: AppColors.lightPrimary.withOpacity(0.9),
+                    color: AppColors.lightPrimary.withAlpha(229),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
