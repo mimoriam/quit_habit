@@ -178,6 +178,11 @@ class _Questionnaire5ScreenState extends State<Questionnaire5Screen> {
                           _selectedOption = option;
                         });
 
+                        // Navigator.pushReplacement(
+                        //   context,
+                        //   createRightToLeftRoute(const HomeScreen()),
+                        // );
+
                         Navigator.pushReplacement(
                           context,
                           createRightToLeftRoute(const HomeScreen()),
