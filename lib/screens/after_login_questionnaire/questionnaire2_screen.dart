@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:quit_habit/utils/app_colors.dart';
+import 'package:quit_habit/utils/navigation_utils.dart';
 import 'package:quit_habit/screens/after_login_questionnaire/questionnaire3_screen.dart';
 
 class Questionnaire2Screen extends StatefulWidget {
@@ -35,8 +36,8 @@ class _Questionnaire2ScreenState extends State<Questionnaire2Screen> {
   void _onNext() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => const Questionnaire3Screen(),
+      createRightToLeftRoute(
+        const Questionnaire3Screen(),
       ),
     );
   }
