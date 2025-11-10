@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
+import 'package:quit_habit/screens/navbar/profile/my_data/my_data_screen.dart';
 import 'package:quit_habit/utils/app_colors.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -17,16 +19,13 @@ class ProfileScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 24),
-
+                const SizedBox(height: 16), // Compacted
                 // 1. Header
                 _buildHeader(theme),
-                const SizedBox(height: 24),
-
+                const SizedBox(height: 20), // Compacted
                 // 2. Stats
                 _buildStats(theme),
-                const SizedBox(height: 24),
-
+                const SizedBox(height: 20), // Compacted
                 // 3. Share Button
                 SizedBox(
                   width: double.infinity,
@@ -36,7 +35,8 @@ class ProfileScreen extends StatelessWidget {
                     label: const Text('Share Your Progress'),
                     style: theme.elevatedButtonTheme.style?.copyWith(
                       padding: WidgetStateProperty.all(
-                        const EdgeInsets.symmetric(vertical: 16),
+                        // Compacted
+                        const EdgeInsets.symmetric(vertical: 14),
                       ),
                       backgroundColor: WidgetStateProperty.all(
                         AppColors.lightPrimary,
@@ -44,18 +44,25 @@ class ProfileScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: 32),
-
+                const SizedBox(height: 24), // Compacted
                 // 4. Account & Profile
                 _buildSectionHeader(theme, 'ACCOUNT & PROFILE'),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10), // Compacted
                 _buildSettingsCard(
                   children: [
                     _ProfileMenuItem(
                       icon: Icons.person_outline,
                       iconColor: AppColors.lightPrimary,
                       title: 'My Data',
-                      onTap: () {},
+                      onTap: () {
+                        PersistentNavBarNavigator.pushNewScreen(
+                          context,
+                          screen: const MyDataScreen(),
+                          withNavBar: true, // Show nav bar on the new screen
+                          pageTransitionAnimation:
+                              PageTransitionAnimation.cupertino,
+                        );
+                      },
                     ),
                     _ProfileMenuItem(
                       icon: Icons.notifications_none_outlined,
@@ -65,11 +72,10 @@ class ProfileScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
-
+                const SizedBox(height: 20), // Compacted
                 // 5. Subscription
                 _buildSectionHeader(theme, 'SUBSCRIPTION'),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10), // Compacted
                 _buildSettingsCard(
                   children: [
                     _ProfileMenuItem(
@@ -87,11 +93,10 @@ class ProfileScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
-
+                const SizedBox(height: 20), // Compacted
                 // 6. Learning & Support
                 _buildSectionHeader(theme, 'LEARNING & SUPPORT'),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10), // Compacted
                 _buildSettingsCard(
                   children: [
                     _ProfileMenuItem(
@@ -108,11 +113,10 @@ class ProfileScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
-
+                const SizedBox(height: 20), // Compacted
                 // 7. Data & Privacy
                 _buildSectionHeader(theme, 'DATA & PRIVACY'),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10), // Compacted
                 _buildSettingsCard(
                   children: [
                     _ProfileMenuItem(
@@ -135,11 +139,10 @@ class ProfileScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
-
+                const SizedBox(height: 20), // Compacted
                 // 8. About
                 _buildSectionHeader(theme, 'ABOUT'),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10), // Compacted
                 _buildSettingsCard(
                   children: [
                     _ProfileMenuItem(
@@ -156,11 +159,10 @@ class ProfileScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
-
+                const SizedBox(height: 20), // Compacted
                 // 9. Sign Out
                 _buildSignOutButton(theme),
-                const SizedBox(height: 24), // Bottom padding
+                const SizedBox(height: 20), // Compacted Bottom padding
               ],
             ),
           ),
@@ -212,7 +214,8 @@ class ProfileScreen extends StatelessWidget {
   /// Builds the stats row (Days, Saved, Not Smoked)
   Widget _buildStats(ThemeData theme) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20),
+      // Compacted
+      padding: const EdgeInsets.symmetric(vertical: 16),
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(16),
@@ -318,7 +321,8 @@ class ProfileScreen extends StatelessWidget {
           },
           borderRadius: BorderRadius.circular(15), // match parent
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            // Compacted
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center, // Center the content
               children: [
@@ -402,7 +406,8 @@ class _ProfileMenuItem extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          // Compacted
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
             children: [
               Container(
