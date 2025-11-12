@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:icons_plus/icons_plus.dart';
 import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
 import 'package:quit_habit/screens/navbar/home/report_relapse/report_relapse_screen.dart';
 import 'package:quit_habit/screens/navbar/tools/tools_screen.dart';
@@ -53,6 +54,7 @@ class HomeScreen extends StatelessWidget {
           label: '0%',
           bgColor: AppColors.badgeGreen, // Corrected Color
           iconColor: AppColors.lightSuccess, // Corrected Color
+          textColor: AppColors.lightSuccess,
         ),
         const SizedBox(width: 8),
         _buildStatBadge(
@@ -61,6 +63,7 @@ class HomeScreen extends StatelessWidget {
           label: '1',
           bgColor: AppColors.badgeBlue, // Corrected Color
           iconColor: AppColors.lightPrimary, // Corrected Color
+          textColor: AppColors.lightPrimary,
         ),
         const SizedBox(width: 8),
         _buildStatBadge(
@@ -69,28 +72,29 @@ class HomeScreen extends StatelessWidget {
           label: '0',
           bgColor: AppColors.badgeOrange, // Corrected Color
           iconColor: AppColors.lightWarning, // Corrected Color
+          textColor: AppColors.lightWarning,
         ),
         const Spacer(),
         // Pro Button
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: AppColors.lightWarning,
+            color: AppColors.proColor,
             borderRadius: BorderRadius.circular(20),
           ),
           child: Row(
             children: [
               const Icon(
-                Icons.workspace_premium_outlined,
+                FontAwesome.crown_solid,
                 color: AppColors.white,
                 size: 16,
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: 10),
               Text(
                 'Pro',
                 style: theme.textTheme.labelMedium?.copyWith(
                   color: AppColors.white,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.bold,
                   fontSize: 14,
                 ),
               ),
@@ -107,10 +111,11 @@ class HomeScreen extends StatelessWidget {
     required IconData icon,
     required String label,
     required Color bgColor,
+    required Color textColor,
     required Color iconColor,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(20),
@@ -122,8 +127,9 @@ class HomeScreen extends StatelessWidget {
           Text(
             label,
             style: theme.textTheme.labelMedium?.copyWith(
-              color: AppColors.lightTextPrimary,
-              fontWeight: FontWeight.w600,
+              color: textColor,
+              fontWeight: FontWeight.bold,
+              
             ),
           ),
         ],

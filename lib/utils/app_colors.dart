@@ -15,21 +15,27 @@ class AppColors {
   static const Color lightDivider = Color(0xFFE5E7EB);
   static const Color lightSuccess = Color(0xFF10B981);
   static const Color lightError = Color(0xFFEF4444);
+  static const proColor = Color(0xFFFF6900);
   static const Color lightWarning = Color(0xFFF59E0B);
 
   // --- NEW COLORS FROM DESIGN ---
   static const Color lightBlueBackground = Color(0xFFF0F6FF); // For streak card
   static const Color lightRed = Color(0xFFFF6B6B); // For Breathing card
-  static const Color lightBlueDistraction = Color(0xFFEFF6FF); // For Exercise card
-  static const Color lightGreenBackground = Color(0xFFF0FDF4); // For Meditate card
+  static const Color lightBlueDistraction = Color(
+    0xFFEFF6FF,
+  ); // For Exercise card
+  static const Color lightGreenBackground = Color(
+    0xFFF0FDF4,
+  ); // For Meditate card
 
   static const Color badgeGreen = Color(0xFFE0FBEF); // For 0% badge bg
   static const Color badgeBlue = Color(0xFFE5F0FF); // For 1 badge bg
   static const Color badgeOrange = Color(0xFFFFF7E6); // For 0 badge bg
-  
-  static const Color lightOrangeBackground = Color(0xFFFFFBEB); // For Premium card
-  // --- END OF NEW COLORS ---
 
+  static const Color lightOrangeBackground = Color(
+    0xFFFFFBEB,
+  ); // For Premium card
+  // --- END OF NEW COLORS ---
 
   // Gradient Colors
   static const Color gradientStart = Color(0xFFF5F3FF);

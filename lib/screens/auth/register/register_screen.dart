@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:form_builder_validators/form_builder_validators.dart';
+import 'package:icons_plus/icons_plus.dart';
 import 'package:quit_habit/utils/app_colors.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -92,25 +93,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Container(
-                              width: 20,
-                              height: 20,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF4285F4),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  'G',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    height: 1.0,
-                                  ),
-                                ),
-                              ),
-                            ),
+                            Brand(Brands.google, size: 20),
                             const SizedBox(width: 12),
                             Text(
                               'Sign up with Google',

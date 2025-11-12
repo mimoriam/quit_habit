@@ -6,6 +6,7 @@ import 'package:quit_habit/screens/after_login_questionnaire/questionnaire1_scre
 import 'package:quit_habit/screens/auth/login/forgot_password/forgot_password_screen.dart';
 import 'package:quit_habit/screens/auth/register/register_screen.dart';
 import 'package:quit_habit/utils/app_colors.dart';
+import 'package:icons_plus/icons_plus.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -130,25 +131,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Container(
-                                width: 20,
-                                height: 20,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF4285F4),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    'G',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                      height: 1.0,
-                                    ),
-                                  ),
-                                ),
-                              ),
+                              Brand(Brands.google, size: 20),
                               const SizedBox(width: 12),
                               Text(
                                 'Continue with Google',
