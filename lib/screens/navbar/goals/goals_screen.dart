@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:icons_plus/icons_plus.dart';
 import 'package:quit_habit/utils/app_colors.dart';
 
 class GoalsScreen extends StatefulWidget {
@@ -76,25 +77,25 @@ class _GoalsScreenState extends State<GoalsScreen> {
         ),
         // --- UPDATED: Pro Badge ---
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: AppColors.lightWarning, // Correct orange color
+            color: AppColors.proColor,
             borderRadius: BorderRadius.circular(20),
           ),
           child: Row(
             children: [
               const Icon(
-                Icons.workspace_premium_outlined, // Added icon
+                FontAwesome.crown_solid,
                 color: AppColors.white,
                 size: 16,
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: 10),
               Text(
                 'Pro',
                 style: theme.textTheme.labelMedium?.copyWith(
                   color: AppColors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14, // Slightly larger for balance
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
                 ),
               ),
             ],
@@ -254,7 +255,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
       height: 44, // Reduced height
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: AppColors.lightInputBackground,
+        color: AppColors.lightTextTertiary.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Stack(
@@ -404,7 +405,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
               Text(
                 '71%',
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: AppColors.lightPrimary,
+                  color: AppColors.lightTextSecondary,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -647,12 +648,12 @@ class _GoalsScreenState extends State<GoalsScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                    duration,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppColors.lightTextSecondary,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
+                duration,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppColors.lightTextSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
               TextButton(
                 onPressed: () {
                   // TODO: Handle Start Challenge

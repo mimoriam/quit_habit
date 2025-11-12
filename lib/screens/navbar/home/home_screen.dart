@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:icons_plus/icons_plus.dart';
 import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
+import 'package:quit_habit/screens/navbar/common/common_header.dart';
 import 'package:quit_habit/screens/navbar/home/report_relapse/report_relapse_screen.dart';
 import 'package:quit_habit/screens/navbar/tools/tools_screen.dart';
 import 'package:quit_habit/utils/app_colors.dart';
@@ -22,18 +23,19 @@ class HomeScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 16),
-                _buildHeader(theme),
-                const SizedBox(height: 24),
+                // _buildHeader(theme),
+                const CommonHeader(),
+                const SizedBox(height: 12),
                 _buildStreakCard(context, theme),
-                const SizedBox(height: 24),
+                const SizedBox(height: 12),
                 _buildDistractionSection(theme, context),
-                const SizedBox(height: 24),
+                const SizedBox(height: 12),
                 _buildWeeklyProgress(theme),
-                const SizedBox(height: 24),
+                const SizedBox(height: 12),
                 _buildActiveChallenge(theme),
-                const SizedBox(height: 24),
+                const SizedBox(height: 12),
                 _buildTodaysPlan(theme),
-                const SizedBox(height: 24),
+                const SizedBox(height: 12),
                 _buildPremiumCard(theme),
                 const SizedBox(height: 24), // Bottom padding
               ],
@@ -129,7 +131,6 @@ class HomeScreen extends StatelessWidget {
             style: theme.textTheme.labelMedium?.copyWith(
               color: textColor,
               fontWeight: FontWeight.bold,
-              
             ),
           ),
         ],
@@ -138,126 +139,132 @@ class HomeScreen extends StatelessWidget {
   }
 
   /// Builds the main "Day 34" streak card
+  /// Builds the main "Day 34" streak card
   Widget _buildStreakCard(BuildContext context, ThemeData theme) {
-    return Stack(
-      clipBehavior: Clip.none, // Allow overlay to show
-      children: [
-        // Main Card Content
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: AppColors.lightBlueBackground,
-            borderRadius: BorderRadius.circular(24),
-            // --- ADDED: Border ---
-            border: Border.all(
-              color: AppColors.lightBorder.withOpacity(0.7),
-              width: 1,
+    // This Container provides the shape, background, and clipping
+    return Container(
+      width: double.infinity,
+      clipBehavior: Clip.hardEdge, // This clips the overlay circle
+      decoration: BoxDecoration(
+        color: AppColors.lightBlueBackground,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.lightBlueBackground, width: 1),
+      ),
+      child: Stack(
+        children: [
+          // This Positioned widget is the overlay, drawn first (underneath)
+          Positioned(
+            top: -20,
+            right: -20,
+            child: Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                color: AppColors.lightPrimary.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
             ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Keep Going!',
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      color: AppColors.lightTextPrimary,
-                      fontWeight: FontWeight.w700,
+
+          // This Padding holds the main content, drawn on top of the overlay
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Keep Going!',
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        color: AppColors.lightTextPrimary,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.lightBorder),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      color: Colors.transparent,
+                      child: const Icon(
+                        Icons.military_tech_outlined,
+                        color: AppColors.lightWarning,
+                        size: 24,
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.military_tech_outlined,
-                      color: AppColors.lightWarning,
-                      size: 24,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Day 34',
-                style: theme.textTheme.displayLarge?.copyWith(
-                  fontSize: 44,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.lightTextPrimary,
+                  ],
                 ),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    // --- CORRECTED: OutlinedButton Styling ---
-                    child: OutlinedButton(
-                      onPressed: () {
-                        // TODO: Handle "Complete" day
-                      },
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(
-                          color: AppColors.lightPrimary,
-                          width: 1.5,
+                const SizedBox(height: 4),
+                Text(
+                  'Day 34',
+                  style: theme.textTheme.displayLarge?.copyWith(
+                    fontSize: 44,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.lightTextPrimary,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                LinearProgressIndicator(
+                  value: 0.4, // Hardcoded to match image
+                  backgroundColor: AppColors.lightBorder.withOpacity(0.5),
+                  color: AppColors.lightTextPrimary,
+                  borderRadius: BorderRadius.circular(10),
+                  minHeight: 8,
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          // TODO: Handle "Complete" day
+                        },
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(
+                            color: AppColors.lightPrimary,
+                            width: 1.5,
+                          ),
+                          minimumSize: const Size(0, 48),
+                          backgroundColor: AppColors.white,
+                          foregroundColor: AppColors.lightPrimary,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
-                        minimumSize: const Size(0, 48),
-                        backgroundColor: AppColors.white,
-                        foregroundColor: AppColors.lightPrimary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: Text(
-                        'Complete',
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          color: AppColors.lightPrimary,
+                        child: Text(
+                          'Complete',
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: AppColors.lightPrimary,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        PersistentNavBarNavigator.pushNewScreen(
-                          context,
-                          screen: const ReportRelapseScreen(),
-                          withNavBar: false,
-                          pageTransitionAnimation:
-                              PageTransitionAnimation.cupertino,
-                        );
-                      },
-                      style: theme.elevatedButtonTheme.style?.copyWith(
-                        minimumSize: WidgetStateProperty.all(const Size(0, 48)),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          PersistentNavBarNavigator.pushNewScreen(
+                            context,
+                            screen: const ReportRelapseScreen(),
+                            withNavBar: false,
+                            pageTransitionAnimation:
+                                PageTransitionAnimation.cupertino,
+                          );
+                        },
+                        style: theme.elevatedButtonTheme.style?.copyWith(
+                          minimumSize: WidgetStateProperty.all(
+                            const Size(0, 48),
+                          ),
+                        ),
+                        child: const Text('Relapse'),
                       ),
-                      child: const Text('Relapse'),
                     ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        // --- ADDED: Circular Overlay ---
-        Positioned(
-          top: -20,
-          right: -20,
-          child: Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              color: AppColors.white.withOpacity(0.3),
-              shape: BoxShape.circle,
+                  ],
+                ),
+              ],
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -453,7 +460,7 @@ class HomeScreen extends StatelessWidget {
                               '71%',
                               style: theme.textTheme.bodyMedium?.copyWith(
                                 fontWeight: FontWeight.w600,
-                                color: AppColors.lightPrimary,
+                                color: AppColors.lightTextSecondary,
                               ),
                             ),
                           ],
@@ -586,7 +593,7 @@ class HomeScreen extends StatelessWidget {
             style: theme.textTheme.bodyMedium?.copyWith(
               color: AppColors.lightTextPrimary,
               fontWeight: FontWeight.w500,
-              fontSize: 14, // Reduced from 15
+              fontSize: 13, // Reduced from 15
             ),
           ),
         ),
@@ -665,7 +672,7 @@ class _DistractionCard extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20),
+      padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: BoxDecoration(
         color: bgColor, // Corrected
         borderRadius: BorderRadius.circular(16),
@@ -722,7 +729,7 @@ class _WeekDay extends StatelessWidget {
       case 'pending':
         bgColor = AppColors.lightWarning;
         icon = const Icon(
-          Icons.nightlight_round,
+          Icons.pending,
           color: AppColors.white,
           size: 14,
         );

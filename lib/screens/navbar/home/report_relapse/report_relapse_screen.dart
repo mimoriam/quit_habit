@@ -61,19 +61,19 @@ class _ReportRelapseScreenState extends State<ReportRelapseScreen> {
                         'Understanding triggers helps prevent future relapses',
                         style: theme.textTheme.bodyMedium,
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 12),
 
                       // Triggers Grid
                       _buildTriggersGrid(theme),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 12),
 
                       // Warning Box
                       _buildWarningBox(theme),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 12),
 
                       // Action Buttons
                       _buildActionButtons(theme),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 12),
 
                       // Footer Box
                       _buildFooterBox(theme),

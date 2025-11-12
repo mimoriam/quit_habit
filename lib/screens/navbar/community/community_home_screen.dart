@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
+import 'package:quit_habit/screens/navbar/common/common_header.dart';
 import 'package:quit_habit/screens/navbar/community/add_post/add_post_screen.dart';
 import 'package:quit_habit/screens/navbar/community/post_comment/post_comment_screen.dart';
 import 'package:quit_habit/utils/app_colors.dart';
@@ -34,7 +35,7 @@ class CommunityHomeScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 16),
-                _buildHeader(theme),
+                const CommonHeader(),
                 const SizedBox(height: 24),
 
                 // --- Community Posts List ---

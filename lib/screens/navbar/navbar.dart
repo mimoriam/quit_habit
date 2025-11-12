@@ -5,7 +5,6 @@ import 'package:quit_habit/screens/navbar/goals/goals_screen.dart';
 import 'package:quit_habit/screens/navbar/home/home_screen.dart';
 import 'package:quit_habit/screens/navbar/plan/plan_screen.dart';
 import 'package:quit_habit/screens/navbar/profile/profile_screen.dart';
-import 'package:quit_habit/screens/navbar/tools/tools_screen.dart';
 import 'package:quit_habit/utils/app_colors.dart';
 
 class NavBar extends StatelessWidget {
@@ -73,17 +72,17 @@ class NavBar extends StatelessWidget {
         activeColorPrimary: AppColors.lightPrimary,
         inactiveColorPrimary: AppColors.lightTextTertiary,
         textStyle: const TextStyle(
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: FontWeight.w600,
         ),
       ),
       PersistentBottomNavBarItem(
-        icon: const Icon(Icons.flag_rounded),
-        title: "Goals",
+        icon: const Icon(Icons.circle_sharp),
+        title: "Challenges",
         activeColorPrimary: AppColors.lightPrimary,
         inactiveColorPrimary: AppColors.lightTextTertiary,
         textStyle: const TextStyle(
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -93,7 +92,7 @@ class NavBar extends StatelessWidget {
         activeColorPrimary: AppColors.lightPrimary,
         inactiveColorPrimary: AppColors.lightTextTertiary,
         textStyle: const TextStyle(
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -103,7 +102,7 @@ class NavBar extends StatelessWidget {
         activeColorPrimary: AppColors.lightPrimary,
         inactiveColorPrimary: AppColors.lightTextTertiary,
         textStyle: const TextStyle(
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -113,7 +112,7 @@ class NavBar extends StatelessWidget {
         activeColorPrimary: AppColors.lightPrimary,
         inactiveColorPrimary: AppColors.lightTextTertiary,
         textStyle: const TextStyle(
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: FontWeight.w600,
         ),
       ),

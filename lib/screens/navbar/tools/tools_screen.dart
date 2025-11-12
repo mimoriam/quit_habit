@@ -174,22 +174,6 @@ class _ToolsScreenState extends State<ToolsScreen> {
         ),
         _ToolCard(
           width: cardWidth,
-          icon: Icons.grid_on,
-          title: 'Word Puzzle',
-          subtitle: 'Distract mind',
-          iconColor: _kPuzzleColor,
-          backgroundColor: _kPuzzleBg,
-          onTap: () {
-            // TODO: Create and navigate to WordPuzzleScreen
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Word Puzzle screen not built yet!'),
-              ),
-            );
-          },
-        ),
-        _ToolCard(
-          width: cardWidth,
           icon: Icons.star_outline_rounded,
           title: 'Inspiration',
           subtitle: 'Daily quotes',

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:quit_habit/screens/navbar/common/common_header.dart';
 import 'package:quit_habit/utils/app_colors.dart';
 
 class AddPostScreen extends StatefulWidget {
@@ -45,7 +46,7 @@ class _AddPostScreenState extends State<AddPostScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 16),
-                _buildHeader(theme), // This is the top badges row
+                const CommonHeader(),
                 const SizedBox(height: 24),
                 // --- This is the custom app bar row from the design ---
                 _buildCustomAppBar(context, theme),

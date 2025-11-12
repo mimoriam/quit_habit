@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:quit_habit/screens/navbar/common/common_header.dart';
 import 'package:quit_habit/utils/app_colors.dart';
 
 class PostCommentScreen extends StatefulWidget {
@@ -73,7 +74,7 @@ class _PostCommentScreenState extends State<PostCommentScreen> {
               children: [
                 // --- MOVED: Header with badges is now at the top of the body ---
                 const SizedBox(height: 16),
-                _buildHeader(theme),
+                const CommonHeader(),
                 const SizedBox(height: 16),
                 // --- ADDED: New custom AppBar ---
                 _buildAppBar(context, theme),
