@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:quit_habit/utils/app_colors.dart';
 
 class ReportRelapseScreen extends StatefulWidget {
@@ -10,6 +11,8 @@ class ReportRelapseScreen extends StatefulWidget {
 
 class _ReportRelapseScreenState extends State<ReportRelapseScreen> {
   String? _selectedTrigger;
+  bool _coinPenaltyActive = true;
+  final DateTime _relapseDate = DateTime(2025, 11, 13); // From screenshot
 
   final List<Map<String, dynamic>> _triggers = [
     {
@@ -24,7 +27,7 @@ class _ReportRelapseScreenState extends State<ReportRelapseScreen> {
   ];
 
   void _handleConfirm() {
-    // TODO: Implement relapse logic (e.g., reset streak, log trigger)
+    // TODO: Implement relapse logic (e.g., reset streak, log trigger, apply penalty)
     Navigator.pop(context);
   }
 
@@ -44,10 +47,14 @@ class _ReportRelapseScreenState extends State<ReportRelapseScreen> {
             Expanded(
               child: SingleChildScrollView(
                 child: Padding(
-                  padding: const EdgeInsets.all(24.0),
+                  padding: const EdgeInsets.all(18.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Relapse Date Card
+                      _buildRelapseDateCard(theme),
+                      const SizedBox(height: 12),
+
                       // Headers
                       Text(
                         'What triggered this relapse?',
@@ -56,27 +63,18 @@ class _ReportRelapseScreenState extends State<ReportRelapseScreen> {
                           color: AppColors.lightTextPrimary,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Understanding triggers helps prevent future relapses',
-                        style: theme.textTheme.bodyMedium,
-                      ),
                       const SizedBox(height: 12),
 
                       // Triggers Grid
                       _buildTriggersGrid(theme),
                       const SizedBox(height: 12),
 
-                      // Warning Box
-                      _buildWarningBox(theme),
+                      // Coin Penalty Card
+                      _buildCoinPenaltyCard(theme),
                       const SizedBox(height: 12),
 
                       // Action Buttons
                       _buildActionButtons(theme),
-                      const SizedBox(height: 12),
-
-                      // Footer Box
-                      _buildFooterBox(theme),
                     ],
                   ),
                 ),
@@ -90,13 +88,12 @@ class _ReportRelapseScreenState extends State<ReportRelapseScreen> {
 
   Widget _buildTopBanner(BuildContext context, ThemeData theme) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 16, 16, 16),
+      // --- COMPACTED ---
+      padding: const EdgeInsets.fromLTRB(24, 12, 16, 12),
       decoration: BoxDecoration(
-        // --- UPDATED: .withValues instead of .withOpacity ---
         color: AppColors.lightError.withValues(alpha: 0.08),
         border: Border(
           bottom: BorderSide(
-            // --- UPDATED: .withValues instead of .withOpacity ---
             color: AppColors.lightError.withValues(alpha: 0.2),
             width: 1,
           ),
@@ -111,12 +108,27 @@ class _ReportRelapseScreenState extends State<ReportRelapseScreen> {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              "It's okay, setbacks happen. Let's learn from this.",
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppColors.lightError.withValues(alpha: 0.9),
-                fontWeight: FontWeight.w500,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Report Relapse",
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: AppColors.lightError,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  "It's okay, setbacks happen. Let's learn from this.",
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: AppColors.lightError.withValues(alpha: 0.9),
+                    fontWeight: FontWeight.w500,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
             ),
           ),
           IconButton(
@@ -128,12 +140,62 @@ class _ReportRelapseScreenState extends State<ReportRelapseScreen> {
     );
   }
 
+  Widget _buildRelapseDateCard(ThemeData theme) {
+    return Container(
+      // --- COMPACTED ---
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.lightBorder, width: 1.5),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Relapse Date',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: AppColors.lightTextSecondary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  DateFormat('MMM d, yyyy').format(_relapseDate),
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.lightTextPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.lightError.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              Icons.calendar_month_outlined,
+              color: AppColors.lightError,
+              size: 24,
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
   Widget _buildTriggersGrid(ThemeData theme) {
     return GridView.builder(
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
+        // --- UPDATED: Child Aspect Ratio to fix cutoff ---
         childAspectRatio: 1.5,
       ),
       itemCount: _triggers.length,
@@ -156,35 +218,89 @@ class _ReportRelapseScreenState extends State<ReportRelapseScreen> {
     );
   }
 
-  Widget _buildWarningBox(ThemeData theme) {
+  Widget _buildCoinPenaltyCard(ThemeData theme) {
     return Container(
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        // --- UPDATED: .withValues instead of .withOpacity ---
-        color: AppColors.lightWarning.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          // --- UPDATED: .withValues instead of .withOpacity ---
-          color: AppColors.lightWarning.withValues(alpha: 0.3),
-          width: 1,
-        ),
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.lightBorder, width: 1.5),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
         children: [
-          Icon(
-            Icons.warning_amber_rounded,
-            color: AppColors.lightWarning.withValues(alpha: 0.9),
-            size: 20,
+          Padding(
+            // --- COMPACTED ---
+            padding: const EdgeInsets.fromLTRB(20, 12, 16, 12),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.lightWarning.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.access_time,
+                    color: AppColors.lightWarning,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Coin Penalty',
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: AppColors.lightTextPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '10 coins will be deducted',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: AppColors.lightTextSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: _coinPenaltyActive,
+                  onChanged: (val) {
+                    setState(() {
+                      _coinPenaltyActive = val;
+                    });
+                  },
+                  activeColor: AppColors.lightPrimary,
+                )
+              ],
+            ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              'This will reset your current streak, but your achievements remain!',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppColors.lightWarning.withValues(alpha: 0.9),
-                fontWeight: FontWeight.w500,
-              ),
+          const Divider(height: 1.5, color: AppColors.lightBorder),
+          Padding(
+            // --- COMPACTED ---
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: AppColors.lightTextTertiary,
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'This helps you stay accountable to your recovery journey',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: AppColors.lightTextSecondary,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -228,9 +344,8 @@ class _ReportRelapseScreenState extends State<ReportRelapseScreen> {
             child: ElevatedButton(
               onPressed: _selectedTrigger == null ? null : _handleConfirm,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.lightError,
-                // --- UPDATED: .withValues instead of .withOpacity ---
-                disabledBackgroundColor: AppColors.lightError.withValues(
+                backgroundColor: AppColors.lightPrimary,
+                disabledBackgroundColor: AppColors.lightPrimary.withValues(
                   alpha: 0.4,
                 ),
               ),
@@ -245,32 +360,6 @@ class _ReportRelapseScreenState extends State<ReportRelapseScreen> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildFooterBox(ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        // --- UPDATED: .withValues instead of .withOpacity ---
-        color: AppColors.lightPrimary.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          // --- UPDATED: .withValues instead of .withOpacity ---
-          color: AppColors.lightPrimary.withValues(alpha: 0.2),
-          width: 1,
-        ),
-      ),
-      child: Center(
-        child: Text(
-          "Remember: You're stronger than you think. This is just a temporary setback, not a failure. Start fresh today!",
-          textAlign: TextAlign.center,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: AppColors.lightPrimary,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ),
     );
   }
 }
@@ -302,7 +391,6 @@ class _TriggerOptionCard extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
         decoration: BoxDecoration(
-          // --- UPDATED: .withValues instead of .withOpacity ---
           color: isSelected
               ? AppColors.lightPrimary.withValues(alpha: 0.08)
               : AppColors.white,
@@ -314,7 +402,6 @@ class _TriggerOptionCard extends StatelessWidget {
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    // --- UPDATED: .withValues instead of .withOpacity ---
                     color: AppColors.lightPrimary.withValues(alpha: 0.15),
                     blurRadius: 16,
                     offset: const Offset(0, 4),
@@ -322,7 +409,6 @@ class _TriggerOptionCard extends StatelessWidget {
                 ]
               : [
                   BoxShadow(
-                    // --- UPDATED: .withValues instead of .withOpacity ---
                     color: AppColors.black.withValues(alpha: 0.02),
                     blurRadius: 10,
                     offset: const Offset(0, 2),
