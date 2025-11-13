@@ -15,7 +15,7 @@ class AppColors {
   static const Color lightDivider = Color(0xFFE5E7EB);
   static const Color lightSuccess = Color(0xFF10B981);
   static const Color lightError = Color(0xFFEF4444);
-  static const proColor = Color(0xFFFF6900);
+  static const Color proColor = Color(0xFFFF6900);
   static const Color lightWarning = Color(0xFFF59E0B);
 
   // --- NEW COLORS FROM DESIGN ---
@@ -35,6 +35,34 @@ class AppColors {
   static const Color lightOrangeBackground = Color(
     0xFFFFFBEB,
   ); // For Premium card
+
+  // --- ADDED for Plan Screen ---
+  static const Color withdrawalCardBg = Color(0xFFFFF6F0); // Light orange/red
+  static const Color withdrawalCardIcon = Color(0xFFFA8A3C);
+  
+  // --- ADDED for new Plan Screen design ---
+  static const Color planIconBg = Color(0xFFFFF0EB); // Orange icon bg
+  static const Color planIconColor = Color(0xFFFA6C3A);
+  static const Color planFreedomDayBg = Color(0xFFE6F7F0);
+  static const Color planFreedomDayIcon = Color(0xFF10B981); // Same as lightSuccess
+  static const Color planWithdrawalBg = Color(0xFFFFF5F5); // Light red bg
+  static const Color planWithdrawalIcon = Color(0xFFEF4444); // Same as lightError
+  static const Color planMilestoneBg = Color(0xFFFFF7E6); // Same as badgeOrange
+  static const Color planMilestoneText = Color(0xFFD97706); // Darker orange
+
+  // --- ADDED Phase Colors from new screenshots ---
+  static const Color planRecoveryBg = Color(0xFFE6F7F0); // Same as freedom day
+  static const Color planRecoveryIcon = Color(0xFF10B981); // Same as freedom day
+  static const Color planAdjustmentBg = Color(0xFFEFF6FF); // Light blue
+  static const Color planAdjustmentIcon = Color(0xFF4B7BFF); // Same as lightPrimary
+  static const Color planTransformationBg = Color(0xFFF9F5FF); // Light purple
+  static const Color planTransformationIcon = Color(0xFF8B5CF6); // Same as lightSecondary
+  static const Color planStrengtheningBg = Color(0xFFFFF7EB); // Light orange
+  static const Color planStrengtheningIcon = Color(0xFFD97706); // Same as planMilestoneText
+  static const Color planMasteryBg = Color(0xFFEBF5FF); // Lighter blue
+  static const Color planMasteryIcon = Color(0xFF3B82F6); // Medium blue
+  static const Color planFreedomPhaseBg = Color(0xFFFFFBEB); // Same as lightOrangeBackground
+  static const Color planFreedomPhaseIcon = Color(0xFFD97706); // Same as planMilestoneText
   // --- END OF NEW COLORS ---
 
   // Gradient Colors
