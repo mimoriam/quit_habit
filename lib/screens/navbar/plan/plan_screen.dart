@@ -309,7 +309,7 @@ class _PlanScreenState extends State<PlanScreen> {
                       padding: EdgeInsets.only(
                         // Add padding above the phase header
                         // except for the very first one
-                        top: isFirstTask ? 4.0 : 16.0, // --- REDUCED ---
+                        top: isFirstTask ? 0.0 : 16.0, // <-- MODIFIED
                         bottom: 16.0, // --- REDUCED ---
                         left: 8.0, // Match main horizontal padding
                         right: 8.0,
@@ -580,7 +580,7 @@ class _PlanScreenState extends State<PlanScreen> {
     return TimelineTile(
       alignment: TimelineAlign.manual,
       lineXY:
-          0.06, // Aligns line 6% from left, leaves space for 24px indicator
+          0.02, // Aligns line 6% from left, leaves space for 24px indicator
       isFirst: isFirst,
       isLast: isLast,
       // --- UPDATED: Line is always grey and behind the child ---
@@ -600,7 +600,7 @@ class _PlanScreenState extends State<PlanScreen> {
         padding: EdgeInsets.only(
             left: 12.0,
             // --- UPDATED: Conditional bottom padding ---
-            bottom: task.status == TaskStatus.locked ? 8.0 : 12.0),
+            bottom: task.status == TaskStatus.locked ? 8.0 : 12.0), // <-- MODIFIED
         child: _buildTaskCard(theme, task),
       ),
     );
@@ -623,7 +623,7 @@ class _PlanScreenState extends State<PlanScreen> {
     if (isLocked) {
       return Container(
         padding: const EdgeInsets.symmetric(
-            horizontal: 16, vertical: 12), // Compacted
+            horizontal: 16, vertical: 16), // Compacted
         decoration: BoxDecoration(
           color: AppColors.white,
           borderRadius: BorderRadius.circular(12), // Compacted
