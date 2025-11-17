@@ -20,20 +20,23 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _isTyping = false;
-  bool _hasChatStarted = false; // <-- ADDED: Tracks if the chat has begun
+  bool _hasChatStarted = false;
+  bool _isGenerating = false; // Added to control "Stop generating" button
 
-  // Initial messages from the screenshot
-  final List<ChatMessage> _messages = [
+  // Initial guidelines messages
+  final List<ChatMessage> _guidelineMessages = [
     ChatMessage(
         text:
-            "I'm here to guide you, motivate you, and answer anything you need on your quit journey. Ask me anything or choose a question to begin"),
+            "I'm here to guide you, motivate you, and answer anything you need on your quit journey."),
     ChatMessage(
         text:
-            "Every message you send helps me give you more personalized guidance. Just start typing whenever you're ready"),
+            "Every message you send helps me give you more personalized guidance."),
     ChatMessage(
-        text:
-            "Whether you're dealing with cravings, stress, habit triggers, or just need encouragement, you can talk to me anytime"),
+        text: "You can ask me anything about cravings, stress, or habits."),
   ];
+
+  // Actual chat messages
+  final List<ChatMessage> _messages = [];
 
   @override
   void initState() {
@@ -57,35 +60,37 @@ class _ChatScreenState extends State<ChatScreen> {
     if (_isTyping) {
       final text = _controller.text;
 
-      // --- MODIFICATION: Check if chat is starting ---
       if (!_hasChatStarted) {
         setState(() {
           _hasChatStarted = true;
-          _messages.clear(); // Clear the guidelines
         });
       }
-      // --- END MODIFICATION ---
 
       setState(() {
         _messages.add(ChatMessage(text: text, isUser: true));
         _controller.clear();
+        _isGenerating = true; // Show stop button
       });
 
-      // Scroll to the bottom after sending
       _scrollToBottom();
 
-      // TODO: Add logic to get a response from the AI
-      // For demo, just add a simple response
-      Future.delayed(const Duration(milliseconds: 500), () {
-        setState(() {
-          _messages.add(ChatMessage(text: "Thanks for sharing! I'm here to help."));
-        });
-        _scrollToBottom();
+      // Simulate AI Response delay
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) {
+          setState(() {
+            _messages.add(ChatMessage(
+              text:
+                  "After 7 days smoke-free, you're already seeing big changes:\n• Your sense of taste and smell improves\n• Breathing becomes easier\n• Energy levels increase\n• Carbon monoxide levels drop to normal\n• Your risk of sudden heart problems decreases",
+              isUser: false,
+            ));
+            _isGenerating = false; // Hide stop button
+          });
+          _scrollToBottom();
+        }
       });
     }
   }
 
-  /// Scrolls the ListView to the very bottom
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
@@ -102,296 +107,345 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: AppColors.lightBackground,
+      backgroundColor: AppColors.white, // Changed to white based on screenshot
       resizeToAvoidBottomInset: true,
       appBar: _buildAppBar(theme),
       body: SafeArea(
         bottom: false,
-        child: Column(
+        child: Stack(
           children: [
-            // Chat messages
-            Expanded(
-              // --- MODIFICATION: Conditionally show guidelines or chat ---
-              child: _hasChatStarted
-                  ? _buildChatList(theme)
-                  : _buildGuidelinesList(theme),
-              // --- END MODIFICATION ---
+            Column(
+              children: [
+                // Chat messages area
+                Expanded(
+                  child: _hasChatStarted
+                      ? _buildChatList(theme)
+                      : _buildGuidelinesList(theme),
+                ),
+                
+                // Input field
+                _buildInputField(theme),
+              ],
             ),
-            // Input field
-            _buildInputField(theme),
 
-
+            // "Stop generating" button floating above input
+            if (_isGenerating)
+              Positioned(
+                bottom: 90, // Above the input field
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.lightBorder),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 12,
+                          height: 12,
+                          decoration: const BoxDecoration(
+                            color: AppColors.lightTextPrimary,
+                            shape: BoxShape.rectangle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          "Stop generating...",
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: AppColors.lightTextSecondary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
     );
   }
 
-  // --- ADDED: Widget for centered guidelines ---
+  // --- Guidelines (Empty State) ---
   Widget _buildGuidelinesList(ThemeData theme) {
     return Padding(
-      padding: const EdgeInsets.all(16.0),
-      // --- MODIFICATION: Added LayoutBuilder and SingleChildScrollView ---
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          return SingleChildScrollView(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                // Ensure the column is at least as tall as the available space
-                minHeight: constraints.maxHeight,
+      padding: const EdgeInsets.all(24.0),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: _guidelineMessages.map((message) {
+            return Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.lightBackground,
+                borderRadius: BorderRadius.circular(16),
               ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: _messages.map((message) {
-                  // Build a bubble but force it to be centered
-                  return _buildChatBubble(theme, message, forceCenter: true);
-                }).toList(),
+              child: Text(
+                message.text,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: AppColors.lightTextSecondary,
+                  height: 1.4,
+                ),
               ),
-            ),
-          );
-        },
+            );
+          }).toList(),
+        ),
       ),
-      // --- END MODIFICATION ---
     );
   }
 
-  // --- ADDED: Widget for the actual chat message list ---
+  // --- Chat List ---
   Widget _buildChatList(ThemeData theme) {
     return ListView.builder(
       controller: _scrollController,
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
       itemCount: _messages.length,
       itemBuilder: (context, index) {
-        return _buildChatBubble(theme, _messages[index]);
+        final message = _messages[index];
+        if (message.isUser) {
+          return _buildUserMessage(theme, message);
+        } else {
+          return _buildAIMessage(theme, message);
+        }
       },
     );
   }
 
-  /// Builds the custom AppBar for the chat screen
-  PreferredSizeWidget _buildAppBar(ThemeData theme) {
-    return AppBar(
-      backgroundColor: AppColors.lightBackground,
-      elevation: 0,
-      leading: IconButton(
-        icon: const Icon(
-          Icons.arrow_back,
-          color: AppColors.lightTextPrimary,
-          size: 24,
+  // --- 1. User Message UI (Blue Card) ---
+  Widget _buildUserMessage(ThemeData theme, ChatMessage message) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24.0),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.lightBlueBackground, // Matches light blue bg
+          borderRadius: BorderRadius.circular(16),
         ),
-        onPressed: () => Navigator.pop(context),
-      ),
-      titleSpacing: 0,
-      centerTitle: true,
-      title: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Gradient Logo
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // User Avatar (Placeholder image from assets or generic)
+            ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  AppColors.lightSecondary, // Purple
-                  AppColors.lightPrimary, // Blue
-                ],
+              child: Image.asset(
+                'images/icons/cig_1.png', // Using a placeholder asset
+                width: 32,
+                height: 32,
+                fit: BoxFit.cover,
+                errorBuilder: (c, o, s) => Container(
+                  width: 32,
+                  height: 32,
+                  color: AppColors.lightPrimary.withOpacity(0.2),
+                  child: const Icon(Icons.person, size: 20, color: AppColors.lightPrimary),
+                ),
               ),
             ),
-            child: const Icon(
-              Icons.history_toggle_off_rounded,
-              color: AppColors.white,
-              size: 18,
+            const SizedBox(width: 12),
+            
+            // Message Text
+            Expanded(
+              child: Text(
+                message.text,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: AppColors.lightTextPrimary,
+                  fontWeight: FontWeight.w500,
+                  height: 1.3,
+                ),
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-          // Title
-          Text(
-            'QUIT AI',
-            style: theme.textTheme.headlineMedium?.copyWith(
+            
+            // Edit Icon
+            const SizedBox(width: 8),
+            const Icon(
+              Icons.edit_outlined,
+              size: 18,
               color: AppColors.lightTextPrimary,
-              fontWeight: FontWeight.w700,
-              fontSize: 20,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- 2. AI Message UI (Content Block) ---
+  Widget _buildAIMessage(ThemeData theme, ChatMessage message) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header: Avatar + Actions
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Gradient AI Logo
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20), // Circle
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      AppColors.lightSecondary, // Purple
+                      AppColors.lightPrimary, // Blue
+                    ],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.lightSecondary.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.check_circle_outline_rounded, // Logo inside
+                  color: AppColors.white,
+                  size: 20,
+                ),
+              ),
+              
+              const Spacer(),
+              
+              // Action Buttons (Copy/Share)
+              Row(
+                children: [
+                  InkWell(
+                    onTap: () {},
+                    child: const Icon(Icons.copy_outlined, size: 20, color: AppColors.lightTextPrimary),
+                  ),
+                  const SizedBox(width: 16),
+                  InkWell(
+                    onTap: () {},
+                    child: const Icon(Icons.share_outlined, size: 20, color: AppColors.lightTextPrimary),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // Message Content
+          Padding(
+            padding: const EdgeInsets.only(left: 0), // Aligned with edge
+            child: Text(
+              message.text,
+              style: theme.textTheme.bodyLarge?.copyWith(
+                color: AppColors.lightTextSecondary, // Slightly lighter text color
+                height: 1.6, // More line height for readability
+                fontSize: 15,
+              ),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  // --- AppBar ---
+  PreferredSizeWidget _buildAppBar(ThemeData theme) {
+    return AppBar(
+      backgroundColor: AppColors.white,
+      elevation: 0,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back, color: AppColors.lightTextPrimary),
+        onPressed: () => Navigator.pop(context),
+      ),
+      centerTitle: true,
+      title: Text(
+        'QUIT AI',
+        style: theme.textTheme.headlineMedium?.copyWith(
+          color: AppColors.lightTextPrimary,
+          fontWeight: FontWeight.w700,
+          fontSize: 20,
+        ),
+      ),
       actions: [
-        // Coin Badge
         Padding(
           padding: const EdgeInsets.only(right: 16.0),
-          child: _buildCoinBadge(theme),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.badgeOrange),
+            ),
+            child: Row(
+              children: [
+                 Image.asset("images/icons/header_coin.png", width: 16, height: 16),
+                 const SizedBox(width: 4),
+                Text(
+                  '4\$',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: AppColors.lightWarning,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ],
     );
   }
 
-  /// Builds the coin badge for the AppBar
-  Widget _buildCoinBadge(ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.badgeOrange,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        children: [
-          Image.asset(
-            "images/icons/header_coin.png",
-            width: 16,
-            height: 16,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            '4\$', // From screenshot
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: AppColors.lightWarning,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Builds a single chat bubble
-  // --- MODIFICATION: Added 'forceCenter' parameter ---
-  Widget _buildChatBubble(ThemeData theme, ChatMessage message,
-      {bool forceCenter = false}) {
-    final bool isAI = !message.isUser;
-
-    // --- MODIFICATION: Alignment is forced if 'forceCenter' is true ---
-    final alignment = forceCenter
-        ? Alignment.center
-        : (isAI ? Alignment.centerLeft : Alignment.centerRight);
-
-    final color = isAI
-        ? AppColors.lightPrimary.withOpacity(0.1)
-        : AppColors.lightPrimary;
-    final textColor =
-        isAI ? AppColors.lightTextPrimary : AppColors.white;
-
-    // --- MODIFICATION: Guidelines use AI bubble style ---
-    final borderRadius = (isAI || forceCenter)
-        ? const BorderRadius.only(
-            topRight: Radius.circular(20),
-            bottomLeft: Radius.circular(20),
-            bottomRight: Radius.circular(20),
-          )
-        : const BorderRadius.only(
-            topLeft: Radius.circular(20),
-            bottomLeft: Radius.circular(20),
-            bottomRight: Radius.circular(20),
-          );
-
-    return Align(
-      alignment: alignment,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 6.0),
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.75,
-        ),
-        decoration: BoxDecoration(
-          // --- MODIFICATION: Guideline color uses AI style ---
-          color: forceCenter ? AppColors.lightPrimary.withOpacity(0.1) : color,
-          borderRadius: borderRadius,
-        ),
-        child: Text(
-          message.text,
-          // --- MODIFICATION: Centered text for AI/Guidelines, left-align for user ---
-          textAlign: (isAI || forceCenter) ? TextAlign.center : TextAlign.start,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            // --- MODIFICATION: Guideline text color uses AI style ---
-            color: forceCenter ? AppColors.lightTextPrimary : textColor,
-            fontSize: 15,
-            height: 1.4,
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Builds the text input field at the bottom
+  // --- Input Field ---
   Widget _buildInputField(ThemeData theme) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 16.0,
-        vertical: 12.0,
-      ),
+      padding: const EdgeInsets.all(16.0),
       decoration: const BoxDecoration(
         color: AppColors.white,
-        border: Border(
-          top: BorderSide(color: AppColors.lightBorder, width: 1.5),
-        ),
+        // Optional: Add slight shadow to separate input from content
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          // Text Field
-          Expanded(
-            child: TextField(
-              controller: _controller,
-              style: theme.textTheme.bodyLarge?.copyWith(
-                color: AppColors.lightTextPrimary,
-                fontSize: 15,
-              ),
-              keyboardType: TextInputType.multiline,
-              minLines: 1,
-              maxLines: 5, // Allows the field to grow up to 5 lines
-              decoration: InputDecoration(
-                hintText: 'Send a message.',
-                hintStyle: theme.textTheme.bodyLarge?.copyWith(
-                  color: AppColors.lightTextTertiary,
-                  fontSize: 15,
-                ),
-                filled: true,
-                fillColor: AppColors.white, // From screenshot
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 14,
-                ),
-                // Border style from screenshot
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                    color: AppColors.lightBorder,
-                    width: 1.5,
-                  ),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                    color: AppColors.lightBorder,
-                    width: 1.5,
-                  ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                    color: AppColors.lightPrimary,
-                    width: 2,
-                  ),
-                ),
-              ),
-            ),
+      child: TextField(
+        controller: _controller,
+        style: theme.textTheme.bodyLarge,
+        decoration: InputDecoration(
+          hintText: 'Send a message.',
+          hintStyle: theme.textTheme.bodyLarge?.copyWith(
+            color: AppColors.lightTextTertiary,
           ),
-          const SizedBox(width: 12),
-          // Send Button
-          IconButton(
-            onPressed: _sendMessage,
+          filled: true,
+          fillColor: AppColors.white,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: AppColors.lightBorder),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: AppColors.lightBorder),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: AppColors.lightBorder),
+          ),
+          suffixIcon: IconButton(
             icon: Icon(
               Icons.send_rounded,
-              size: 24,
-              color: _isTyping
-                  ? AppColors.lightPrimary
-                  : AppColors.lightTextTertiary,
+              color: _isTyping ? AppColors.lightPrimary : AppColors.lightBorder,
             ),
-            padding: const EdgeInsets.all(12),
+            onPressed: _sendMessage,
           ),
-        ],
+        ),
       ),
     );
   }
