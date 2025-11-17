@@ -3,7 +3,7 @@ import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
 import 'package:quit_habit/screens/navbar/profile/faq/faq_screen.dart';
 import 'package:quit_habit/screens/navbar/profile/my_data/my_data_screen.dart';
 import 'package:quit_habit/screens/navbar/profile/notifications/notifications_screen.dart';
-import 'package:quit_habit/screens/navbar/profile/subscription_status/subscription_status_screen.dart';
+import 'package:quit_habit/screens/paywall/success_rate_screen.dart';
 import 'package:quit_habit/utils/app_colors.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -222,7 +222,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onPressed: () {
                 PersistentNavBarNavigator.pushNewScreen(
                   context,
-                  screen: const SubscriptionStatusScreen(),
+                  screen: const SuccessRateScreen(),
                   withNavBar: false,
                   pageTransitionAnimation: PageTransitionAnimation.cupertino,
                 );

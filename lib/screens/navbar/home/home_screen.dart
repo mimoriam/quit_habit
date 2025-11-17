@@ -5,6 +5,7 @@ import 'package:quit_habit/screens/navbar/common/common_header.dart';
 import 'package:quit_habit/screens/navbar/home/calendar/calendar_screen.dart';
 import 'package:quit_habit/screens/navbar/home/report_relapse/report_relapse_screen.dart';
 import 'package:quit_habit/screens/navbar/tools/tools_screen.dart';
+import 'package:quit_habit/screens/paywall/success_rate_screen.dart';
 import 'package:quit_habit/utils/app_colors.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -37,7 +38,7 @@ class HomeScreen extends StatelessWidget {
                 const SizedBox(height: 12),
                 _buildTodaysPlan(theme),
                 const SizedBox(height: 12),
-                _buildPremiumCard(theme),
+                _buildPremiumCard(theme, context),
                 const SizedBox(height: 24), // Bottom padding
               ],
             ),
@@ -591,7 +592,7 @@ class HomeScreen extends StatelessWidget {
   }
 
   /// Builds the "Unlock Premium" card
-  Widget _buildPremiumCard(ThemeData theme) {
+  Widget _buildPremiumCard(ThemeData theme, BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -631,7 +632,12 @@ class HomeScreen extends StatelessWidget {
           const SizedBox(height: 20),
           ElevatedButton(
             onPressed: () {
-              // TODO: Navigate to subscription screen
+              PersistentNavBarNavigator.pushNewScreen(
+                context,
+                screen: const SuccessRateScreen(),
+                withNavBar: false,
+                pageTransitionAnimation: PageTransitionAnimation.cupertino,
+              );
             },
             style: theme.elevatedButtonTheme.style?.copyWith(
               backgroundColor: WidgetStateProperty.all(AppColors.proColor),
