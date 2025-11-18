@@ -7,6 +7,7 @@ import 'package:quit_habit/providers/auth_provider.dart';
 import 'package:quit_habit/screens/auth/login/forgot_password/forgot_password_screen.dart';
 import 'package:quit_habit/screens/auth/register/register_screen.dart';
 import 'package:quit_habit/utils/app_colors.dart';
+import 'package:quit_habit/widgets/auth_gate.dart';
 import 'package:icons_plus/icons_plus.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -19,7 +20,8 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormBuilderState>();
   bool _obscurePassword = true;
-  bool _isLoading = false;
+  bool _isGoogleLoading = false;
+  bool _isEmailLoading = false;
 
   Future<void> _handleLogin() async {
     if (_formKey.currentState?.saveAndValidate() ?? false) {
@@ -30,18 +32,47 @@ class _LoginScreenState extends State<LoginScreen> {
       final password = formData['password'] as String;
 
       setState(() {
-        _isLoading = true;
+        _isEmailLoading = true;
       });
 
       try {
         final authProvider = Provider.of<AuthProvider>(context, listen: false);
         await authProvider.signInWithEmailAndPassword(email, password);
-        // Navigation is handled by AuthGate
+        
+        // Clear navigation stack and return to root (AuthGate will handle routing)
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const AuthGate()),
+            (route) => false,
+          );
+        }
       } catch (e) {
         if (mounted) {
+          String errorMessage = e.toString().replaceFirst('Exception: ', '');
+          
+          // Check for wrong credentials errors and show specific message
+          // Handle various Firebase auth error formats
+          final errorLower = errorMessage.toLowerCase();
+          if (errorLower.contains('invalid email or password') ||
+              errorLower.contains('invalid credentials') ||
+              errorLower.contains('invalid credential') ||
+              errorLower.contains('no account found') ||
+              errorLower.contains('user-not-found') ||
+              errorLower.contains('wrong-password') ||
+              errorLower.contains('auth credential is incorrect') ||
+              errorLower.contains('supplied auth credential') ||
+              errorLower.contains('credential is incorrect') ||
+              errorLower.contains('malformed') ||
+              errorLower.contains('expired') ||
+              errorLower.contains('incorrect, malformed')) {
+            errorMessage = 'Wrong email or password combo';
+          }
+          
+          // Dismiss any existing SnackBar before showing a new one to avoid Hero tag conflicts
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(e.toString().replaceFirst('Exception: ', '')),
+              content: Text(errorMessage),
               backgroundColor: AppColors.lightError,
               behavior: SnackBarBehavior.floating,
             ),
@@ -50,7 +81,7 @@ class _LoginScreenState extends State<LoginScreen> {
       } finally {
         if (mounted) {
           setState(() {
-            _isLoading = false;
+            _isEmailLoading = false;
           });
         }
       }
@@ -59,15 +90,24 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _handleGoogleSignIn() async {
     setState(() {
-      _isLoading = true;
+      _isGoogleLoading = true;
     });
 
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       await authProvider.signInWithGoogle();
-      // Navigation is handled by AuthGate
+      
+      // Clear navigation stack and return to root (AuthGate will handle routing)
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const AuthGate()),
+          (route) => false,
+        );
+      }
     } catch (e) {
       if (mounted) {
+        // Dismiss any existing SnackBar before showing a new one to avoid Hero tag conflicts
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(e.toString().replaceFirst('Exception: ', '')),
@@ -79,7 +119,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } finally {
       if (mounted) {
         setState(() {
-          _isLoading = false;
+          _isGoogleLoading = false;
         });
       }
     }
@@ -152,14 +192,14 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Material(
                       color: Colors.transparent,
                       child: InkWell(
-                        onTap: _isLoading ? null : _handleGoogleSignIn,
+                        onTap: (_isGoogleLoading || _isEmailLoading) ? null : _handleGoogleSignIn,
                         borderRadius: BorderRadius.circular(12),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              if (_isLoading)
+                              if (_isGoogleLoading)
                                 const SizedBox(
                                   height: 20,
                                   width: 20,
@@ -169,7 +209,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 )
                               else
                                 Brand(Brands.google, size: 20),
-                              if (!_isLoading) const SizedBox(width: 12),
+                              if (!_isGoogleLoading) const SizedBox(width: 12),
                               Text(
                                 'Continue with Google',
                                 style: theme.textTheme.labelLarge?.copyWith(
@@ -456,7 +496,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           width: double.infinity,
                           height: 50,
                           child: ElevatedButton(
-                            onPressed: _isLoading ? null : _handleLogin,
+                            onPressed: (_isEmailLoading || _isGoogleLoading) ? null : _handleLogin,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.lightPrimary,
                               foregroundColor: AppColors.white,
@@ -467,7 +507,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               disabledBackgroundColor: AppColors.lightPrimary
                                   .withValues(alpha: 0.5),
                             ),
-                            child: _isLoading
+                            child: _isEmailLoading
                                 ? const SizedBox(
                                     height: 20,
                                     width: 20,

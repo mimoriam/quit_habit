@@ -13,29 +13,61 @@ class AuthGate extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<AuthProvider>(
       builder: (context, authProvider, _) {
-        // Show loading indicator while checking auth status
+        Widget currentScreen;
+        String screenKey;
+
+        // Determine which screen to show
         if (authProvider.isLoading) {
-          return Scaffold(
-            backgroundColor: AppColors.lightBackground,
-            body: const Center(
-              child: CircularProgressIndicator(),
-            ),
-          );
+          // Initial load - show loading screen while checking auth state
+          currentScreen = const _LoadingScreen();
+          screenKey = 'loading';
+        } else if (!authProvider.isAuthenticated) {
+          // Not authenticated - show login screen
+          currentScreen = const LoginScreen();
+          screenKey = 'login';
+        } else if (!authProvider.hasCompletedQuestionnaire) {
+          // Authenticated but hasn't completed questionnaire - show questionnaire
+          currentScreen = const Questionnaire1Screen();
+          screenKey = 'questionnaire';
+        } else {
+          // Authenticated and completed questionnaire - show main app
+          currentScreen = const NavBar();
+          screenKey = 'navbar';
         }
 
-        // Not authenticated - show login screen
-        if (!authProvider.isAuthenticated) {
-          return const LoginScreen();
-        }
-
-        // Authenticated but hasn't completed questionnaire - show questionnaire
-        if (!authProvider.hasCompletedQuestionnaire) {
-          return const Questionnaire1Screen();
-        }
-
-        // Authenticated and completed questionnaire - show main app
-        return const NavBar();
+        // Use AnimatedSwitcher for seamless transitions between screens
+        return AnimatedSwitcher(
+          duration: const Duration(milliseconds: 250),
+          transitionBuilder: (Widget child, Animation<double> animation) {
+            return FadeTransition(
+              opacity: animation,
+              child: child,
+            );
+          },
+          child: KeyedSubtree(
+            key: ValueKey(screenKey),
+            child: currentScreen,
+          ),
+        );
       },
+    );
+  }
+}
+
+/// Loading screen shown during initial auth state check
+class _LoadingScreen extends StatelessWidget {
+  const _LoadingScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.lightBackground,
+      body: Center(
+        child: CircularProgressIndicator(
+          color: AppColors.lightPrimary,
+          strokeWidth: 3,
+        ),
+      ),
     );
   }
 }

@@ -6,6 +6,7 @@ import 'package:icons_plus/icons_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:quit_habit/providers/auth_provider.dart';
 import 'package:quit_habit/utils/app_colors.dart';
+import 'package:quit_habit/widgets/auth_gate.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -19,6 +20,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
+  bool _isGoogleLoading = false;
 
   Future<void> _handleRegister() async {
     if (_formKey.currentState?.saveAndValidate() ?? false) {
@@ -40,7 +42,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
           password,
           fullName,
         );
-        // Navigation is handled by AuthGate
+        
+        // Clear navigation stack and return to root (AuthGate will handle routing)
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const AuthGate()),
+            (route) => false,
+          );
+        }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -63,13 +72,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _handleGoogleSignUp() async {
     setState(() {
-      _isLoading = true;
+      _isGoogleLoading = true;
     });
 
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       await authProvider.signInWithGoogle();
-      // Navigation is handled by AuthGate
+      
+      // Clear navigation stack and return to root (AuthGate will handle routing)
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const AuthGate()),
+          (route) => false,
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -83,7 +99,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     } finally {
       if (mounted) {
         setState(() {
-          _isLoading = false;
+          _isGoogleLoading = false;
         });
       }
     }
@@ -156,14 +172,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
-                      onTap: _isLoading ? null : _handleGoogleSignUp,
+                      onTap: (_isLoading || _isGoogleLoading) ? null : _handleGoogleSignUp,
                       borderRadius: BorderRadius.circular(12),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            if (_isLoading)
+                            if (_isGoogleLoading)
                               const SizedBox(
                                 height: 20,
                                 width: 20,
@@ -173,7 +189,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               )
                             else
                               Brand(Brands.google, size: 20),
-                            if (!_isLoading) const SizedBox(width: 12),
+                            if (!_isGoogleLoading) const SizedBox(width: 12),
                             Text(
                               'Sign up with Google',
                               style: theme.textTheme.labelLarge?.copyWith(
@@ -458,7 +474,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                         validator: FormBuilderValidators.compose([
                           FormBuilderValidators.required(),
-                          FormBuilderValidators.minLength(8),
+                          FormBuilderValidators.minLength(6),
                         ]),
                         textInputAction: TextInputAction.next,
                       ),
@@ -631,7 +647,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         width: double.infinity,
                         height: 48,
                         child: ElevatedButton(
-                          onPressed: _isLoading ? null : _handleRegister,
+                          onPressed: (_isLoading || _isGoogleLoading) ? null : _handleRegister,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.lightPrimary,
                             foregroundColor: AppColors.white,

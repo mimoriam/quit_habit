@@ -183,15 +183,11 @@ class _Questionnaire5ScreenState extends State<Questionnaire5Screen> {
                         try {
                           final authProvider =
                               Provider.of<AuthProvider>(context, listen: false);
-                          final user = authProvider.user;
-
-                          if (user != null) {
-                            // Mark questionnaire as completed
-                            await authProvider.userService
-                                .markQuestionnaireCompleted(user.uid);
-                            // Refresh questionnaire status
-                            await authProvider.refreshQuestionnaireStatus();
-                          }
+                          
+                          // Mark questionnaire as completed
+                          // For email/password users: saves to Firestore
+                          // For Google users: only updates local state (not persisted)
+                          await authProvider.markQuestionnaireCompleted();
 
                           if (mounted) {
                             Navigator.pushReplacement(

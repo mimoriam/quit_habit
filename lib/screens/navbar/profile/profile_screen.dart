@@ -6,7 +6,10 @@ import 'package:quit_habit/screens/navbar/profile/faq/faq_screen.dart';
 import 'package:quit_habit/screens/navbar/profile/my_data/my_data_screen.dart';
 import 'package:quit_habit/screens/navbar/profile/notifications/notifications_screen.dart';
 import 'package:quit_habit/screens/paywall/success_rate_screen.dart';
+import 'package:quit_habit/services/user_service.dart';
 import 'package:quit_habit/utils/app_colors.dart';
+import 'package:quit_habit/widgets/auth_gate.dart';
+import 'package:intl/intl.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -18,11 +21,88 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   // 0: Badges, 1: Stats, 2: Learn, 3: Settings
   int _selectedTabIndex = 3; // Default to Settings as per initial image
+  final UserService _userService = UserService();
+  Map<String, dynamic>? _userData;
+  bool _isLoadingUserData = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final user = authProvider.user;
+    
+    if (user == null) return;
+
+    setState(() {
+      _isLoadingUserData = true;
+    });
+
+    try {
+      // Try to get user data from Firestore first (for email/password users)
+      final userDoc = await _userService.getUserDocument(user.uid);
+      if (mounted) {
+        setState(() {
+          _userData = userDoc;
+          _isLoadingUserData = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingUserData = false;
+        });
+      }
+    }
+  }
 
   void _onTabTapped(int index) {
     setState(() {
       _selectedTabIndex = index;
     });
+  }
+
+  String _getUserName() {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final user = authProvider.user;
+    
+    if (user == null) return 'User';
+    
+    // Try Firestore displayName first (for email/password users)
+    if (_userData != null && _userData!['displayName'] != null) {
+      final displayName = _userData!['displayName'] as String;
+      if (displayName.isNotEmpty) {
+        return displayName;
+      }
+    }
+    
+    // Fallback to Firebase Auth displayName (for Google users)
+    if (user.displayName != null && user.displayName!.isNotEmpty) {
+      return user.displayName!;
+    }
+    
+    // Fallback to email username
+    if (user.email != null) {
+      return user.email!.split('@')[0];
+    }
+    
+    return 'User';
+  }
+
+  String _getMemberSinceText() {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final user = authProvider.user;
+    
+    if (user == null || user.metadata.creationTime == null) {
+      return 'Member since recently';
+    }
+    
+    final creationDate = user.metadata.creationTime!;
+    final formatter = DateFormat('MMM yyyy');
+    return 'Member since ${formatter.format(creationDate)}';
   }
 
   @override
@@ -163,13 +243,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Sarah Johnson',
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 18,
-                      ),
-                    ),
+                    _isLoadingUserData
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(
+                            _getUserName(),
+                            style: theme.textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 18,
+                            ),
+                          ),
                     const SizedBox(height: 4),
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -188,7 +274,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Member since Oct 2025',
+                      _getMemberSinceText(),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: AppColors.lightTextTertiary,
                         fontSize: 12,
@@ -946,7 +1032,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final authProvider =
             Provider.of<AuthProvider>(context, listen: false);
         await authProvider.signOut();
-        // Navigation is handled by AuthGate
+        
+        // Clear navigation stack and return to root (AuthGate will handle routing to LoginScreen)
+        // Use root navigator to bypass PersistentTabView's navigation context
+        if (mounted) {
+          Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const AuthGate()),
+            (route) => false,
+          );
+        }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

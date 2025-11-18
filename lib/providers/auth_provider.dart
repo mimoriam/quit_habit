@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:quit_habit/services/auth_service.dart';
 import 'package:quit_habit/services/user_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
@@ -26,8 +27,8 @@ class AuthProvider extends ChangeNotifier {
     _authService.authStateChanges.listen((User? user) async {
       _user = user;
       if (user != null) {
-        // Check questionnaire status
-        await _checkQuestionnaireStatus(user.uid);
+        // Check questionnaire status (Firestore for email/password, SharedPreferences for Google)
+        await _checkQuestionnaireStatus(user);
       } else {
         _hasCompletedQuestionnaire = false;
       }
@@ -36,16 +37,42 @@ class AuthProvider extends ChangeNotifier {
     });
   }
 
-  Future<void> _checkQuestionnaireStatus(String uid) async {
+  /// Check if user signed in with Google
+  bool _isGoogleSignInUser(User user) {
+    return user.providerData.any((info) => info.providerId == 'google.com');
+  }
+
+  Future<void> _checkQuestionnaireStatus(User user) async {
+    // Google sign-in users don't have Firestore documents
+    if (_isGoogleSignInUser(user)) {
+      // Check SharedPreferences for Google users
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final key = _getQuestionnaireKey(user.uid);
+        _hasCompletedQuestionnaire = prefs.getBool(key) ?? false;
+      } catch (e) {
+        // If check fails, assume not completed
+        _hasCompletedQuestionnaire = false;
+      }
+      notifyListeners();
+      return;
+    }
+
+    // Only check Firestore for email/password users
     try {
       _hasCompletedQuestionnaire =
-          await _userService.hasCompletedQuestionnaire(uid);
+          await _userService.hasCompletedQuestionnaire(user.uid);
       notifyListeners();
     } catch (e) {
       // If check fails, assume not completed
       _hasCompletedQuestionnaire = false;
       notifyListeners();
     }
+  }
+
+  /// Get SharedPreferences key for questionnaire status
+  String _getQuestionnaireKey(String uid) {
+    return 'questionnaire_completed_$uid';
   }
 
   /// Sign in with Google
@@ -58,10 +85,8 @@ class AuthProvider extends ChangeNotifier {
       final user = userCredential.user;
 
       if (user != null) {
-        // Create user document if it doesn't exist
-        await _userService.createUserDocument(user);
-        // Check questionnaire status
-        await _checkQuestionnaireStatus(user.uid);
+        // Check questionnaire status (will load from SharedPreferences for Google users)
+        await _checkQuestionnaireStatus(user);
       }
 
       _isLoading = false;
@@ -83,7 +108,7 @@ class AuthProvider extends ChangeNotifier {
       final user = _authService.currentUser;
 
       if (user != null) {
-        await _checkQuestionnaireStatus(user.uid);
+        await _checkQuestionnaireStatus(user);
       }
 
       _isLoading = false;
@@ -147,7 +172,34 @@ class AuthProvider extends ChangeNotifier {
   /// Refresh questionnaire status
   Future<void> refreshQuestionnaireStatus() async {
     if (_user != null) {
-      await _checkQuestionnaireStatus(_user!.uid);
+      await _checkQuestionnaireStatus(_user!);
+    }
+  }
+
+  /// Mark questionnaire as completed (for Google users, persists to SharedPreferences)
+  Future<void> markQuestionnaireCompleted() async {
+    if (_user == null) return;
+
+    final isGoogleUser = _isGoogleSignInUser(_user!);
+    
+    if (isGoogleUser) {
+      // For Google users, save to SharedPreferences
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final key = _getQuestionnaireKey(_user!.uid);
+        await prefs.setBool(key, true);
+        _hasCompletedQuestionnaire = true;
+        notifyListeners();
+      } catch (e) {
+        // If saving fails, still update local state
+        _hasCompletedQuestionnaire = true;
+        notifyListeners();
+      }
+    } else {
+      // For email/password users, save to Firestore
+      await _userService.markQuestionnaireCompleted(_user!.uid);
+      _hasCompletedQuestionnaire = true;
+      notifyListeners();
     }
   }
 }
