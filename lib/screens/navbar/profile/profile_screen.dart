@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
 import 'package:provider/provider.dart';
 import 'package:quit_habit/providers/auth_provider.dart';
+import 'package:quit_habit/screens/navbar/chat/chat_onboarding_screen.dart';
 import 'package:quit_habit/screens/navbar/profile/faq/faq_screen.dart';
 import 'package:quit_habit/screens/navbar/profile/my_data/my_data_screen.dart';
 import 'package:quit_habit/screens/navbar/profile/notifications/notifications_screen.dart';
@@ -844,7 +845,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           onTap: () {
             PersistentNavBarNavigator.pushNewScreen(
               context,
-              screen: const FaqScreen(),
+              // screen: const FaqScreen(),
+              screen: const ChatOnboardingScreen(),
               withNavBar: false,
               pageTransitionAnimation: PageTransitionAnimation.cupertino,
             );

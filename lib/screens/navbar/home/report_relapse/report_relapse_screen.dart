@@ -266,15 +266,15 @@ class _ReportRelapseScreenState extends State<ReportRelapseScreen> {
                     ],
                   ),
                 ),
-                Switch(
-                  value: _coinPenaltyActive,
-                  onChanged: (val) {
-                    setState(() {
-                      _coinPenaltyActive = val;
-                    });
-                  },
-                  activeColor: AppColors.lightPrimary,
-                )
+                // Switch(
+                //   value: _coinPenaltyActive,
+                //   onChanged: (val) {
+                //     setState(() {
+                //       _coinPenaltyActive = val;
+                //     });
+                //   },
+                //   activeColor: AppColors.lightPrimary,
+                // )
               ],
             ),
           ),
