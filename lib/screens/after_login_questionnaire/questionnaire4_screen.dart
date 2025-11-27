@@ -4,7 +4,14 @@ import 'package:quit_habit/utils/navigation_utils.dart';
 import 'package:quit_habit/screens/after_login_questionnaire/questionnaire5_screen.dart';
 
 class Questionnaire4Screen extends StatefulWidget {
-  const Questionnaire4Screen({super.key});
+  final String? smokingDuration;
+  final int? cigarettesPerDay;
+
+  const Questionnaire4Screen({
+    super.key,
+    this.smokingDuration,
+    this.cigarettesPerDay,
+  });
 
   @override
   State<Questionnaire4Screen> createState() => _Questionnaire4ScreenState();
@@ -180,7 +187,11 @@ class _Questionnaire4ScreenState extends State<Questionnaire4Screen> {
                         Navigator.push(
                           context,
                           createRightToLeftRoute(
-                            const Questionnaire5Screen(),
+                            Questionnaire5Screen(
+                              smokingDuration: widget.smokingDuration,
+                              cigarettesPerDay: widget.cigarettesPerDay,
+                              motivation: option,
+                            ),
                           ),
                         );
                       },

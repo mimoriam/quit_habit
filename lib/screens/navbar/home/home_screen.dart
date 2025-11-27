@@ -164,9 +164,6 @@ class HomeScreen extends StatelessWidget {
         final currentStreak = hasStartDate && habitData != null
             ? habitService.getCurrentStreak(habitData, relapsePeriods)
             : 0;
-        final successRate = hasStartDate && habitData != null
-            ? habitService.getSuccessRate(habitData, relapsePeriods)
-            : 0.0;
 
         // Calculate progress (simple milestone-based: 7, 30, 90, 365 days)
         double progress = 0.0;
@@ -218,29 +215,11 @@ class HomeScreen extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                hasStartDate ? 'Keep Going!' : 'Start Your Journey',
-                                style: theme.textTheme.headlineMedium?.copyWith(
-                                  color: AppColors.lightTextPrimary,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              if (hasStartDate) ...[
-                                const SizedBox(height: 4),
-                                Text(
-                                  '${successRate.toStringAsFixed(1)}% Success Rate',
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: AppColors.lightTextSecondary,
-                                    fontWeight: FontWeight.w500,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ],
-                            ],
+                        Text(
+                          hasStartDate ? 'Keep Going!' : 'Start Your Journey',
+                          style: theme.textTheme.headlineMedium?.copyWith(
+                            color: AppColors.lightTextPrimary,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                         Container(

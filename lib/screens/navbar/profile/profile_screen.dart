@@ -3,7 +3,6 @@ import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
 import 'package:provider/provider.dart';
 import 'package:quit_habit/providers/auth_provider.dart';
 import 'package:quit_habit/screens/navbar/chat/chat_onboarding_screen.dart';
-import 'package:quit_habit/screens/navbar/profile/faq/faq_screen.dart';
 import 'package:quit_habit/screens/navbar/profile/my_data/my_data_screen.dart';
 import 'package:quit_habit/screens/navbar/profile/notifications/notifications_screen.dart';
 import 'package:quit_habit/screens/paywall/success_rate_screen.dart';
@@ -667,9 +666,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               const SizedBox(height: 12),
               Container(
-                width: double.infinity,
-                height: 200,
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
                 decoration: BoxDecoration(
                   color: AppColors.white,
                   borderRadius: BorderRadius.circular(16),
@@ -681,30 +678,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ],
                 ),
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          'Graph Placeholder',
-                          style: theme.textTheme.bodyMedium
-                              ?.copyWith(color: AppColors.lightTextTertiary),
-                        ),
-                      ),
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: ['M', 'T', 'W', 'T', 'F', 'S', 'S']
-                          .map((day) => Text(
-                                day,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: AppColors.lightTextSecondary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ))
-                          .toList(),
-                    ),
-                  ],
+                child: Builder(
+                  builder: (context) {
+                    final weekDays = <String>[];
+                    final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+                    for (int i = 0; i < 7; i++) {
+                      weekDays.add(dayNames[i]);
+                    }
+
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: List.generate(7, (index) {
+                        final dayName = weekDays[index];
+                        // When user is null, all days show as 'not_started'
+                        return _WeekDay(day: dayName, status: 'not_started');
+                      }),
+                    );
+                  },
                 ),
               ),
             ],
@@ -779,9 +770,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 12),
                 Container(
-                  width: double.infinity,
-                  height: 200,
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
                   decoration: BoxDecoration(
                     color: AppColors.white,
                     borderRadius: BorderRadius.circular(16),
@@ -793,30 +782,56 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ],
                   ),
-                  child: Column(
-                    children: [
-                      Expanded(
-                        child: Center(
-                          child: Text(
-                            'Graph Placeholder',
-                            style: theme.textTheme.bodyMedium
-                                ?.copyWith(color: AppColors.lightTextTertiary),
-                          ),
-                        ),
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: ['M', 'T', 'W', 'T', 'F', 'S', 'S']
-                            .map((day) => Text(
-                                  day,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: AppColors.lightTextSecondary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ))
-                            .toList(),
-                      ),
-                    ],
+                  child: Builder(
+                    builder: (context) {
+                      final weekStatuses = habitData != null && habitData.hasStartDate
+                          ? habitService.getWeeklyProgress(habitData, relapsePeriods)
+                          : List<String>.filled(7, 'not_started');
+
+                      // Get current week days (Monday to Sunday)
+                      final today = DateTime.now();
+                      final weekday = today.weekday; // 1 = Monday, 7 = Sunday
+                      final daysFromMonday = weekday - 1;
+                      final monday = DateTime(today.year, today.month, today.day)
+                          .subtract(Duration(days: daysFromMonday));
+
+                      final weekDays = <String>[];
+                      final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+                      for (int i = 0; i < 7; i++) {
+                        weekDays.add(dayNames[i]);
+                      }
+
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: List.generate(7, (index) {
+                          final dayName = weekDays[index];
+                          final status = weekStatuses[index];
+                          final dayDate = monday.add(Duration(days: index));
+                          final todayNormalized =
+                              DateTime(today.year, today.month, today.day);
+                          final dayNormalized =
+                              DateTime(dayDate.year, dayDate.month, dayDate.day);
+                          final isToday = dayNormalized == todayNormalized;
+
+                          // Map status to display status
+                          String displayStatus;
+                          if (status == 'not_started') {
+                            displayStatus = 'not_started'; // Show "..."
+                          } else if (status == 'relapse') {
+                            displayStatus = 'missed'; // Show X
+                          } else if (status == 'clean') {
+                            displayStatus = 'done'; // Show checkmark
+                          } else if (isToday && status != 'relapse') {
+                            displayStatus = 'pending'; // Show pending icon
+                          } else {
+                            displayStatus = 'future'; // Show empty circle
+                          }
+
+                          return _WeekDay(day: dayName, status: displayStatus);
+                        }),
+                      );
+                    },
                   ),
                 ),
               ],
@@ -1251,5 +1266,68 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
       }
     }
+  }
+}
+
+/// Helper widget for each day in the weekly progress bar
+class _WeekDay extends StatelessWidget {
+  final String day;
+  final String status; // 'done', 'missed', 'pending', 'future', 'not_started'
+
+  const _WeekDay({required this.day, required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    Color bgColor;
+    Widget icon;
+
+    switch (status) {
+      case 'done':
+        bgColor = AppColors.lightPrimary;
+        icon = const Icon(Icons.check, color: AppColors.white, size: 16);
+        break;
+      case 'missed':
+        bgColor = AppColors.lightError;
+        icon = const Icon(Icons.close, color: AppColors.white, size: 16);
+        break;
+      case 'pending':
+        bgColor = AppColors.lightWarning;
+        icon = const Icon(Icons.pending, color: AppColors.white, size: 14);
+        break;
+      case 'not_started':
+        bgColor = AppColors.lightBorder.withOpacity(0.5);
+        icon = Text(
+          '...',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: AppColors.lightTextTertiary,
+            fontWeight: FontWeight.w600,
+          ),
+        );
+        break;
+      default: // 'future'
+        bgColor = AppColors.lightBorder.withOpacity(0.5);
+        icon = Container();
+        break;
+    }
+
+    return Column(
+      children: [
+        Text(
+          day,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: AppColors.lightTextSecondary,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(color: bgColor, shape: BoxShape.circle),
+          child: Center(child: icon),
+        ),
+      ],
+    );
   }
 }

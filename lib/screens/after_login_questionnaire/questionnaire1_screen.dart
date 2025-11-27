@@ -181,7 +181,9 @@ class _Questionnaire1ScreenState extends State<Questionnaire1Screen> {
                         Navigator.push(
                           context,
                           createRightToLeftRoute(
-                            const Questionnaire2Screen(),
+                            Questionnaire2Screen(
+                              smokingDuration: option,
+                            ),
                           ),
                         );
                       },

@@ -525,6 +525,18 @@ class _CalendarScreenState extends State<CalendarScreen> {
             final isToday = dayNormalized == todayNormalized;
             final isTodayRelapsed = isToday && _isTodayRelapsed(habitData, relapsePeriods);
 
+            // Check if this is the start date
+            bool isStartDate = false;
+            if (habitData.startDate != null) {
+              final startDate = habitData.startDate!;
+              final startDateNormalized = DateTime(
+                startDate.year,
+                startDate.month,
+                startDate.day,
+              );
+              isStartDate = dayNormalized == startDateNormalized;
+            }
+
             Color bgColor = AppColors.transparent;
             Color textColor = AppColors.lightTextPrimary;
             FontWeight fontWeight = FontWeight.w400;
@@ -544,7 +556,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
               textColor = AppColors.lightTextTertiary;
             }
 
-            if (isSelected) {
+            // Add green border for start date
+            if (isStartDate) {
+              border = Border.all(
+                color: AppColors.lightSuccess,
+                width: 2,
+              );
+            } else if (isSelected) {
               // Add a border for selection
               border = Border.all(
                 color: AppColors.lightTextTertiary.withOpacity(0.8),

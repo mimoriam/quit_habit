@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:icons_plus/icons_plus.dart';
+import 'package:provider/provider.dart';
+import 'package:quit_habit/providers/auth_provider.dart';
+import 'package:quit_habit/services/habit_service.dart';
 import 'package:quit_habit/utils/app_colors.dart';
 
 class CommonHeader extends StatelessWidget {
@@ -8,18 +10,48 @@ class CommonHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final authProvider = Provider.of<AuthProvider>(context);
+    final user = authProvider.user;
+    final habitService = HabitService();
 
     // This is the _buildHeader implementation from home_screen.dart
     return Row(
       children: [
-        _buildStatBadge(
-          theme,
-          // icon: Icons.health_and_safety_outlined,
-          image: "images/icons/header_shield.png",
-          label: '0%',
-          bgColor: AppColors.badgeGreen,
-          iconColor: AppColors.lightSuccess,
-          textColor: AppColors.lightSuccess,
+        Builder(
+          builder: (context) {
+            if (user == null) {
+              return _buildStatBadge(
+                theme,
+                image: "images/icons/header_shield.png",
+                label: '0%',
+                bgColor: AppColors.badgeGreen,
+                iconColor: AppColors.lightSuccess,
+                textColor: AppColors.lightSuccess,
+              );
+            }
+
+            return StreamBuilder<HabitDataWithRelapses?>(
+              stream: habitService.getHabitDataStream(user.uid),
+              builder: (context, snapshot) {
+                final dataWithRelapses = snapshot.data;
+                final habitData = dataWithRelapses?.habitData;
+                final relapsePeriods = dataWithRelapses?.relapsePeriods ?? [];
+                
+                final successRate = habitData != null && habitData.hasStartDate
+                    ? habitService.getSuccessRate(habitData, relapsePeriods)
+                    : 0.0;
+
+                return _buildStatBadge(
+                  theme,
+                  image: "images/icons/header_shield.png",
+                  label: '${successRate.toStringAsFixed(1)}%',
+                  bgColor: AppColors.badgeGreen,
+                  iconColor: AppColors.lightSuccess,
+                  textColor: AppColors.lightSuccess,
+                );
+              },
+            );
+          },
         ),
         const SizedBox(width: 8),
         // _buildStatBadge(

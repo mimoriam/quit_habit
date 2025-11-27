@@ -1,10 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:quit_habit/models/questionnaire_result.dart';
 import 'package:quit_habit/providers/auth_provider.dart';
+import 'package:quit_habit/services/questionnaire_service.dart';
 import 'package:quit_habit/utils/app_colors.dart';
 
 class Questionnaire5Screen extends StatefulWidget {
-  const Questionnaire5Screen({super.key});
+  final String? smokingDuration;
+  final int? cigarettesPerDay;
+  final String? motivation;
+
+  const Questionnaire5Screen({
+    super.key,
+    this.smokingDuration,
+    this.cigarettesPerDay,
+    this.motivation,
+  });
 
   @override
   State<Questionnaire5Screen> createState() => _Questionnaire5ScreenState();
@@ -12,6 +23,72 @@ class Questionnaire5Screen extends StatefulWidget {
 
 class _Questionnaire5ScreenState extends State<Questionnaire5Screen> {
   String? _selectedOption;
+  bool _isSaving = false;
+  final QuestionnaireService _questionnaireService = QuestionnaireService();
+
+  /// Save questionnaire result and mark as completed
+  Future<void> _saveQuestionnaireResult(String smokingTime) async {
+    try {
+      final authProvider =
+          Provider.of<AuthProvider>(context, listen: false);
+
+      // Validate we have a user
+      if (authProvider.user == null) {
+        throw Exception('User not authenticated');
+      }
+
+      // Create QuestionnaireResult with all answers
+      final result = QuestionnaireResult(
+        smokingDuration: widget.smokingDuration,
+        cigarettesPerDay: widget.cigarettesPerDay,
+        motivation: widget.motivation,
+        smokingTime: smokingTime,
+      );
+
+      // Validate result is complete
+      if (!result.isComplete()) {
+        throw Exception(
+            'Questionnaire data is incomplete. Please try again.');
+      }
+
+      // Save questionnaire result to Firestore
+      await _questionnaireService.saveQuestionnaireResult(
+        authProvider.user!.uid,
+        result,
+      );
+
+      // Mark questionnaire as completed (saves to Firestore for all users)
+      await authProvider.markQuestionnaireCompleted();
+
+      // Pop back to AuthGate root - AuthGate will automatically detect
+      // hasCompletedQuestionnaire flag change and route to NavBar
+      if (mounted) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving questionnaire: ${e.toString()}'),
+            backgroundColor: AppColors.lightError,
+            behavior: SnackBarBehavior.floating,
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: AppColors.white,
+              onPressed: () {
+                _saveQuestionnaireResult(smokingTime);
+              },
+            ),
+          ),
+        );
+      }
+      rethrow;
+    }
+  }
 
   final List<String> _options = [
     'In the morning',
@@ -173,39 +250,16 @@ class _Questionnaire5ScreenState extends State<Questionnaire5Screen> {
                     final isSelected = _selectedOption == option;
 
                     return GestureDetector(
-                      onTap: () async {
-                        setState(() {
-                          _selectedOption = option;
-                        });
+                      onTap: _isSaving
+                          ? null
+                          : () async {
+                              setState(() {
+                                _selectedOption = option;
+                                _isSaving = true;
+                              });
 
-                        try {
-                          final authProvider =
-                              Provider.of<AuthProvider>(context, listen: false);
-                          
-                          // Mark questionnaire as completed (saves to Firestore for all users)
-                          await authProvider.markQuestionnaireCompleted();
-
-                          // Pop back to AuthGate root - AuthGate will automatically detect
-                          // hasCompletedQuestionnaire flag change and route to NavBar
-                          if (mounted) {
-                            Navigator.of(context).popUntil((route) => route.isFirst);
-                          }
-                        } catch (e) {
-                          // If marking as completed fails, still pop back to root
-                          // AuthGate will handle the routing based on current state
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                    'Error saving progress: ${e.toString()}'),
-                                backgroundColor: AppColors.lightError,
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                            Navigator.of(context).popUntil((route) => route.isFirst);
-                          }
-                        }
-                      },
+                              await _saveQuestionnaireResult(option);
+                            },
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
                         padding: const EdgeInsets.symmetric(

@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:quit_habit/screens/after_login_questionnaire/questionnaire4_screen.dart';
 import 'package:quit_habit/utils/app_colors.dart';
 import 'package:quit_habit/utils/navigation_utils.dart';
-import 'package:quit_habit/screens/after_login_questionnaire/questionnaire3_screen.dart';
 
 class Questionnaire2Screen extends StatefulWidget {
-  const Questionnaire2Screen({super.key});
+  final String? smokingDuration;
+
+  const Questionnaire2Screen({
+    super.key,
+    this.smokingDuration,
+  });
 
   @override
   State<Questionnaire2Screen> createState() => _Questionnaire2ScreenState();
@@ -34,9 +39,19 @@ class _Questionnaire2ScreenState extends State<Questionnaire2Screen> {
 
   // Handles navigation to the next screen
   void _onNext() {
+    final cigarettesPerDay = int.tryParse(_currentInput);
+    if (cigarettesPerDay == null || cigarettesPerDay <= 0) {
+      return; // Should not happen due to validation, but safety check
+    }
+
     Navigator.push(
       context,
-      createRightToLeftRoute(const Questionnaire3Screen()),
+      createRightToLeftRoute(
+        Questionnaire4Screen(
+          smokingDuration: widget.smokingDuration,
+          cigarettesPerDay: cigarettesPerDay,
+        ),
+      ),
     );
   }
 

@@ -77,7 +77,7 @@ class NavBar extends StatelessWidget {
         ),
       ),
       PersistentBottomNavBarItem(
-        icon: const Icon(Icons.circle_sharp),
+        icon: const Icon(Icons.rounded_corner),
         title: "Challenges",
         activeColorPrimary: AppColors.lightPrimary,
         inactiveColorPrimary: AppColors.lightTextTertiary,
