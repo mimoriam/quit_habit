@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:icons_plus/icons_plus.dart';
 import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:quit_habit/models/habit_data.dart';
+import 'package:quit_habit/models/goal.dart';
+import 'package:quit_habit/models/user_goal.dart';
 import 'package:quit_habit/providers/auth_provider.dart';
 import 'package:quit_habit/services/habit_service.dart';
+import 'package:quit_habit/services/goal_service.dart';
 import 'package:quit_habit/screens/navbar/common/common_header.dart';
 import 'package:quit_habit/screens/navbar/home/calendar/calendar_screen.dart';
 import 'package:quit_habit/screens/navbar/home/report_relapse/report_relapse_screen.dart';
@@ -41,7 +45,7 @@ class HomeScreen extends StatelessWidget {
                 const SizedBox(height: 12),
                 _buildWeeklyProgress(theme),
                 const SizedBox(height: 12),
-                _buildActiveChallenge(theme),
+                _buildActiveChallenge(theme, context),
                 const SizedBox(height: 12),
                 _buildTodaysPlan(theme),
                 const SizedBox(height: 12),
@@ -532,7 +536,213 @@ class HomeScreen extends StatelessWidget {
   }
 
   /// Builds the "Active Challenge" card
-  Widget _buildActiveChallenge(ThemeData theme) {
+  Widget _buildActiveChallenge(ThemeData theme, BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context);
+    final user = authProvider.user;
+    final goalService = GoalService();
+
+    if (user == null) {
+      return const SizedBox.shrink();
+    }
+
+    return StreamBuilder<List<UserGoal>>(
+      stream: goalService.getUserActiveGoals(user.uid),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Active Challenge',
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.lightTextPrimary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                height: 140,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.lightBorder, width: 1.5),
+                ),
+                child: const Center(
+                  child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2.5),
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
+        
+        if (snapshot.hasError) {
+          debugPrint('Error loading active goals: ${snapshot.error}');
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Active Challenge',
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.lightTextPrimary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                height: 140,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.lightBorder, width: 1.5),
+                ),
+                child: Center(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.error_outline, color: AppColors.lightError, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Failed to load goals',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: AppColors.lightError,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
+
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          // If no active challenge, maybe show a "Start Challenge" card or nothing
+          // For now, let's show a card encouraging them to start one
+          return _buildStartChallengeCard(theme, context);
+        }
+
+        // Get the most recent active goal (assuming the stream returns them or we sort them)
+        // Since the query doesn't sort, let's sort locally by startDate descending
+        final userGoals = List<UserGoal>.from(snapshot.data!);
+        userGoals.sort((a, b) => b.startDate.compareTo(a.startDate));
+        final activeGoal = userGoals.first;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Active Challenge',
+              style: theme.textTheme.headlineMedium?.copyWith(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: AppColors.lightTextPrimary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(20),
+                border:
+                    Border.all(color: AppColors.lightBorder, width: 1.5),
+              ),
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(width: 8, color: AppColors.lightPrimary),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Image.asset(
+                                  "images/icons/home_electro.png",
+                                  width: 32,
+                                  height: 32,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  activeGoal.goalTitle,
+                                  style: theme.textTheme.headlineSmall
+                                      ?.copyWith(
+                                    color: AppColors.lightTextPrimary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  activeGoal.goalDescription,
+                                  style:
+                                      theme.textTheme.bodyMedium?.copyWith(
+                                    fontSize: 14,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            Row(
+                              mainAxisAlignment:
+                                  MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Progress',
+                                  style:
+                                      theme.textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                Text(
+                                  '${(activeGoal.goalTargetValue > 0 ? (activeGoal.progress / activeGoal.goalTargetValue).clamp(0.0, 1.0) * 100 : 0).toInt()}%',
+                                  style:
+                                      theme.textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.lightTextSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            LinearProgressIndicator(
+                              value: activeGoal.goalTargetValue > 0 ? (activeGoal.progress / activeGoal.goalTargetValue).clamp(0.0, 1.0) : 0.0,
+                              backgroundColor:
+                                  AppColors.lightBorder.withOpacity(0.5),
+                              color: AppColors.lightPrimary,
+                              borderRadius: BorderRadius.circular(10),
+                              minHeight: 8,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildStartChallengeCard(ThemeData theme, BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -547,88 +757,32 @@ class HomeScreen extends StatelessWidget {
         const SizedBox(height: 16),
         Container(
           width: double.infinity,
-          clipBehavior: Clip.antiAlias, // Ensures rounded corners for children
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: AppColors.white,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: AppColors.lightBorder, width: 1.5),
           ),
-          // --- THIS IS WHERE IntrinsicHeight WAS NEEDED ---
-          child: IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Blue side bar
-                Container(width: 8, color: AppColors.lightPrimary),
-                // Card Content
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // --- CORRECTED: Centered Content ---
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Image.asset(
-                              "images/icons/home_electro.png",
-                              width: 32,
-                              height: 32,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              '7-Day Warrior',
-                              style: theme.textTheme.headlineSmall?.copyWith(
-                                color: AppColors.lightTextPrimary,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Stay smoke-free for 7 consecutive days',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16), // Spacer
-                        // --- Progress Bar Section (Stays left-aligned) ---
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Progress',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            Text(
-                              '71%',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.lightTextSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        LinearProgressIndicator(
-                          value: 0.71,
-                          backgroundColor: AppColors.lightBorder.withOpacity(
-                            0.5,
-                          ),
-                          color: AppColors.lightPrimary,
-                          borderRadius: BorderRadius.circular(10),
-                          minHeight: 8,
-                        ),
-                      ],
-                    ),
-                  ),
+          child: Column(
+            children: [
+              const Icon(Icons.emoji_events_outlined,
+                  size: 40, color: AppColors.lightTextTertiary),
+              const SizedBox(height: 12),
+              Text(
+                'No active challenges',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.lightTextPrimary,
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Start a challenge to earn badges!',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: AppColors.lightTextSecondary,
+                ),
+              ),
+            ],
           ),
         ),
       ],

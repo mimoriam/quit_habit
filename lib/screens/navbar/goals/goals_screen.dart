@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:icons_plus/icons_plus.dart';
+import 'package:provider/provider.dart';
+import 'package:quit_habit/models/goal.dart';
+import 'package:quit_habit/models/user_goal.dart';
+import 'package:quit_habit/services/goal_service.dart';
 import 'package:quit_habit/utils/app_colors.dart';
+import 'package:quit_habit/providers/auth_provider.dart';
 
 class GoalsScreen extends StatefulWidget {
   const GoalsScreen({super.key});
@@ -10,36 +15,43 @@ class GoalsScreen extends StatefulWidget {
 }
 
 class _GoalsScreenState extends State<GoalsScreen> {
-  // 0 = Active, 1 = Available
+  // 0 = Active, 1 = Available, 2 = Completed
   int _selectedTabIndex = 0;
+  final GoalService _goalService = GoalService();
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context);
+    final userId = authProvider.user?.uid;
 
     return Scaffold(
       backgroundColor: AppColors.lightBackground,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
-            // Use 24 horizontal padding as seen in other screens
             padding: const EdgeInsets.symmetric(horizontal: 24.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 20), // Reduced padding
+                const SizedBox(height: 20),
                 _buildHeader(theme),
-                // const SizedBox(height: 20), // Reduced padding
-                // _buildBadgeCollection(theme),
-                const SizedBox(height: 20), // Reduced padding
+                const SizedBox(height: 20),
                 _buildTabs(theme),
-                const SizedBox(height: 20), // Reduced padding
-                // Content that switches based on the tab
-                IndexedStack(
-                  index: _selectedTabIndex,
-                  children: [_buildActiveTab(theme), _buildAvailableTab(theme)],
-                ),
-                const SizedBox(height: 20), // Reduced bottom padding
+                const SizedBox(height: 20),
+                if (userId != null)
+                  IndexedStack(
+                    index: _selectedTabIndex,
+                    children: [
+                      _buildActiveTab(theme, userId),
+                      _buildAvailableTab(theme, userId),
+                      _buildCompletedTab(theme, userId),
+                    ],
+                  )
+                else
+                  const Center(child: Text('Please log in to view goals')),
+                const SizedBox(height: 20),
               ],
             ),
           ),
@@ -48,7 +60,6 @@ class _GoalsScreenState extends State<GoalsScreen> {
     );
   }
 
-  /// Builds the "Challenges" header with Pro badge
   Widget _buildHeader(ThemeData theme) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -75,184 +86,56 @@ class _GoalsScreenState extends State<GoalsScreen> {
             ),
           ],
         ),
-        // --- UPDATED: Pro Badge ---
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: AppColors.proColor,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            children: [
-              const Icon(
-                FontAwesome.crown_solid,
-                color: AppColors.white,
-                size: 16,
-              ),
-              const SizedBox(width: 10),
-              Text(
-                'Pro',
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: AppColors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// Builds the "Badge Collection" card
-  Widget _buildBadgeCollection(ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.all(16), // Reduced padding
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.lightBorder, width: 1.5),
-      ),
-      child: Column(
-        children: [
-          // Header row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Badge Collection',
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      color: AppColors.lightTextPrimary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '2 of 6 earned',
-                    style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
-                  ),
-                ],
-              ),
-              Text(
-                'View All →',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: AppColors.lightPrimary,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16), // Reduced padding
-          // Badges row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildBadgeItem(
-                theme,
-                icon: Icons.star_rounded,
-                label: 'First Day',
-                color: const Color(0xFFFFFBEB), // Light Yellow
-                iconColor: AppColors.lightWarning,
-                earned: true,
-              ),
-              _buildBadgeItem(
-                theme,
-                icon: Icons.emoji_events_rounded,
-                label: '3 Days',
-                color: const Color(0xFFEFF6FF), // Light Blue
-                iconColor: AppColors.lightPrimary,
-                earned: true,
-              ),
-              _buildBadgeItem(
-                theme,
-                icon: Icons.flash_on_rounded,
-                label: 'Week 1',
-                color: AppColors.lightBackground, // Light Grey
-                iconColor: AppColors.lightTextTertiary,
-                earned: false,
-              ),
-              _buildBadgeItem(
-                theme,
-                icon: Icons.calendar_month_rounded,
-                label: 'Month 1',
-                color: AppColors.lightBackground, // Light Grey
-                iconColor: AppColors.lightTextTertiary,
-                earned: false,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Helper for a single badge item
-  Widget _buildBadgeItem(
-    ThemeData theme, {
-    required IconData icon,
-    required String label,
-    required Color color,
-    required Color iconColor,
-    required bool earned,
-  }) {
-    return Column(
-      children: [
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Container(
-              width: 60, // Reduced size
-              height: 60, // Reduced size
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Icon(icon, color: iconColor, size: 30), // Reduced size
+        GestureDetector(
+          onTap: () async {
+            try {
+              await _goalService.seedGoals();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Goals seeded successfully')),
+                );
+              }
+            } catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Failed to seed goals: $e')),
+                );
+              }
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.proColor,
+              borderRadius: BorderRadius.circular(20),
             ),
-            if (earned)
-              Positioned(
-                top: -4,
-                right: -4,
-                child: Container(
-                  width: 20,
-                  height: 20,
-                  decoration: BoxDecoration(
-                    color: AppColors.lightSuccess,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.white, width: 2),
-                  ),
-                  child: const Icon(
-                    Icons.check,
+            child: Row(
+              children: [
+                const Icon(
+                  FontAwesome.crown_solid,
+                  color: AppColors.white,
+                  size: 16,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'Pro',
+                  style: theme.textTheme.labelMedium?.copyWith(
                     color: AppColors.white,
-                    size: 12,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
                   ),
                 ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Text(
-          label,
-          style: theme.textTheme.bodySmall?.copyWith(
-            fontWeight: FontWeight.w500,
-            color: earned
-                ? AppColors.lightTextPrimary
-                : AppColors.lightTextSecondary,
+              ],
+            ),
           ),
         ),
       ],
     );
   }
 
-  /// --- UPDATED: Builds the animated "Active" / "Available" tab switcher ---
   Widget _buildTabs(ThemeData theme) {
     return Container(
-      height: 44, // Reduced height
+      height: 44,
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: AppColors.lightTextTertiary.withOpacity(0.1),
@@ -260,17 +143,16 @@ class _GoalsScreenState extends State<GoalsScreen> {
       ),
       child: Stack(
         children: [
-          // Animated pill
           AnimatedAlign(
             alignment: _selectedTabIndex == 0
                 ? Alignment.centerLeft
+                : _selectedTabIndex == 1
+                ? Alignment.center
                 : Alignment.centerRight,
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeInOut,
             child: Container(
-              width:
-                  (MediaQuery.of(context).size.width - 48 - 8) /
-                  2, // (Screen_width - horizontal_padding - container_padding) / 2
+              width: (MediaQuery.of(context).size.width - 48 - 8) / 3,
               height: double.infinity,
               decoration: BoxDecoration(
                 color: AppColors.white,
@@ -285,11 +167,11 @@ class _GoalsScreenState extends State<GoalsScreen> {
               ),
             ),
           ),
-          // Text buttons
           Row(
             children: [
               Expanded(child: _buildTabItem(theme, 'Active', 0)),
               Expanded(child: _buildTabItem(theme, 'Available', 1)),
+              Expanded(child: _buildTabItem(theme, 'Completed', 2)),
             ],
           ),
         ],
@@ -297,17 +179,14 @@ class _GoalsScreenState extends State<GoalsScreen> {
     );
   }
 
-  /// Helper for a single tab item (now just the text and gesture detector)
   Widget _buildTabItem(ThemeData theme, String title, int index) {
     final bool isSelected = _selectedTabIndex == index;
-
     return GestureDetector(
       onTap: () {
         setState(() {
           _selectedTabIndex = index;
         });
       },
-      // Set behavior to opaque to ensure taps are only registered on this item
       behavior: HitTestBehavior.opaque,
       child: Center(
         child: AnimatedDefaultTextStyle(
@@ -325,21 +204,232 @@ class _GoalsScreenState extends State<GoalsScreen> {
     );
   }
 
-  /// Builds the content for the "Active" tab
-  Widget _buildActiveTab(ThemeData theme) {
-    return Column(
-      children: [
-        _build7DayChallengeCard(theme),
-        const SizedBox(height: 12), // Reduced padding
-        _buildFreeModeCard(theme),
-      ],
+  Widget _buildActiveTab(ThemeData theme, String userId) {
+    return StreamBuilder<List<UserGoal>>(
+      stream: _goalService.getUserActiveGoals(userId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          debugPrint('Error in _buildActiveTab: ${snapshot.error}');
+          return _buildEmptyState(
+            theme,
+            'Something went wrong',
+            'Please try again later.',
+          );
+        }
+        final userGoals = snapshot.data ?? [];
+
+        if (userGoals.isEmpty) {
+          return _buildEmptyState(
+            theme,
+            'No active challenges',
+            'Start a challenge from the Available tab!',
+          );
+        }
+
+        return Column(
+          children: userGoals.map((userGoal) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12.0),
+              child: _buildActiveChallengeCard(theme, userGoal),
+            );
+          }).toList(),
+        );
+      },
     );
   }
 
-  /// Builds the "7-Day Warrior" card
-  Widget _build7DayChallengeCard(ThemeData theme) {
+  Widget _buildAvailableTab(ThemeData theme, String userId) {
+    return StreamBuilder<List<Goal>>(
+      stream: _goalService.getAvailableGoalsFiltered(userId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          debugPrint('Error in _buildAvailableTab: ${snapshot.error}');
+          return _buildEmptyState(
+            theme,
+            'Something went wrong',
+            'Please try again later.',
+          );
+        }
+        final goals = snapshot.data ?? [];
+
+        if (goals.isEmpty) {
+          return _buildEmptyState(
+            theme,
+            'No available challenges',
+            'Check back later for new challenges!',
+          );
+        }
+
+        return Column(
+          children: goals.map((goal) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12.0),
+              child: _buildAvailableChallengeCard(theme, goal, userId),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+
+  Widget _buildCompletedTab(ThemeData theme, String? userId) {
+    if (userId == null) {
+      return _buildEmptyState(
+        theme,
+        'Please log in',
+        'Log in to view your completed challenges.',
+      );
+    }
+    return StreamBuilder<List<UserGoal>>(
+      stream: _goalService.getUserCompletedGoals(userId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          debugPrint('Error in _buildCompletedTab: ${snapshot.error}');
+          return _buildEmptyState(
+            theme,
+            'Something went wrong',
+            'Please try again later.',
+          );
+        }
+
+        final userGoals = snapshot.data ?? [];
+
+        if (userGoals.isEmpty) {
+          return _buildEmptyState(
+            theme,
+            'No completed challenges',
+            'Complete challenges to earn badges!',
+          );
+        }
+
+        return Column(
+          children: userGoals.map((userGoal) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12.0),
+              child: _buildCompletedChallengeCard(theme, userGoal),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+
+  Widget _buildCompletedChallengeCard(ThemeData theme, UserGoal userGoal) {
     return Container(
-      padding: const EdgeInsets.all(16), // Reduced padding
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.lightSuccess.withOpacity(0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.lightSuccess.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.lightSuccess.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.emoji_events_rounded,
+              color: AppColors.lightSuccess,
+              size: 26,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  userGoal.goalTitle,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.lightTextPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Completed on ${userGoal.completedDate != null ? "${userGoal.completedDate!.day}/${userGoal.completedDate!.month}/${userGoal.completedDate!.year}" : "Unknown date"}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: AppColors.lightSuccess,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Icon(
+            Icons.check_circle_rounded,
+            color: AppColors.lightSuccess,
+            size: 24,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(ThemeData theme, String title, String message) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          children: [
+            Icon(
+              Icons.inbox_rounded,
+              size: 48,
+              color: AppColors.lightTextTertiary,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: AppColors.lightTextPrimary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: AppColors.lightTextSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActiveChallengeCard(ThemeData theme, UserGoal userGoal) {
+    // Calculate progress percentage
+    double progressPercent = 0.0;
+    if (userGoal.goalTargetValue > 0) {
+      progressPercent = (userGoal.progress / userGoal.goalTargetValue).clamp(
+        0.0,
+        1.0,
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(16),
@@ -348,12 +438,11 @@ class _GoalsScreenState extends State<GoalsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
           Row(
             children: [
               Container(
-                width: 44, // Reduced size
-                height: 44, // Reduced size
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
                   color: AppColors.lightPrimary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
@@ -361,7 +450,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
                 child: const Icon(
                   Icons.track_changes_rounded,
                   color: AppColors.lightPrimary,
-                  size: 26, // Reduced size
+                  size: 26,
                 ),
               ),
               const SizedBox(width: 12),
@@ -370,29 +459,27 @@ class _GoalsScreenState extends State<GoalsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '7-Day Warrior',
+                      userGoal.goalTitle,
                       style: theme.textTheme.headlineSmall?.copyWith(
                         color: AppColors.lightTextPrimary,
                         fontWeight: FontWeight.w600,
+                        fontSize: 16,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Stay smoke-free for 7 consecutive days',
+                      userGoal.goalDescription,
                       style: theme.textTheme.bodyMedium,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
-              const Icon(
-                Icons.flash_on_rounded,
-                color: AppColors.lightWarning,
-                size: 28,
-              ),
             ],
           ),
-          const SizedBox(height: 16), // Reduced padding
-          // Progress
+
+          const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -402,28 +489,38 @@ class _GoalsScreenState extends State<GoalsScreen> {
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              Text(
-                '71%',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: AppColors.lightTextSecondary,
-                  fontWeight: FontWeight.w600,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '${(progressPercent * 100).toInt()}%',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: AppColors.lightTextSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    '${userGoal.progress} / ${userGoal.goalTargetValue} ${userGoal.unit}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppColors.lightTextTertiary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
           const SizedBox(height: 8),
-          // --- UPDATED: Progress Bar with background ---
           Container(
             height: 8,
             clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
-              // Use lightInputBackground for a clearer track
               color: AppColors.lightInputBackground,
               borderRadius: BorderRadius.circular(100),
             ),
             child: FractionallySizedBox(
               alignment: Alignment.centerLeft,
-              widthFactor: 0.71,
+              widthFactor: progressPercent,
               child: Container(
                 decoration: BoxDecoration(
                   color: AppColors.lightPrimary,
@@ -432,158 +529,16 @@ class _GoalsScreenState extends State<GoalsScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 16), // Reduced padding
-          // Reward
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: AppColors.lightWarning.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: AppColors.lightWarning.withOpacity(0.3),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.emoji_events_rounded,
-                  color: AppColors.lightWarning,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Reward: First Week Badge',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: AppColors.lightTextPrimary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
   }
 
-  /// Builds the "Free Mode" card
-  Widget _buildFreeModeCard(ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.all(16), // Reduced padding
-      // --- UPDATED: Background and Border ---
-      decoration: BoxDecoration(
-        color: AppColors.lightPrimary.withOpacity(0.08), // Light blue bg
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppColors.lightPrimary.withOpacity(0.2), // Light blue border
-          width: 1.5,
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 44, // Reduced size
-            height: 44, // Reduced size
-            decoration: BoxDecoration(
-              // This icon bg is white in the design
-              color: AppColors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.lightBorder),
-            ),
-            child: const Icon(
-              Icons.track_changes_rounded,
-              color: AppColors.lightPrimary,
-              size: 26, // Reduced size
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Free Mode',
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    color: AppColors.lightTextPrimary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Track your progress without challenges. Perfect for a self-paced journey.',
-                  style: theme.textTheme.bodyMedium,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Builds the placeholder content for the "Available" tab
-  Widget _buildAvailableTab(ThemeData theme) {
-    // --- UPDATED: Replaced placeholder with new UI ---
-    return Column(
-      children: [
-        // --- UPDATED: Now a list of individual cards ---
-        _buildAvailableChallengeCard(
-          theme,
-          icon: Icons.emoji_events_outlined,
-          iconColor: AppColors.lightSuccess,
-          title: 'First Month Victory',
-          description: 'Complete your first 30 days without smoking',
-          duration: '30 days',
-          reward: '🏆',
-        ),
-        const SizedBox(height: 12), // Space between cards
-        _buildAvailableChallengeCard(
-          theme,
-          icon: Icons.people_outline,
-          iconColor: AppColors.lightPrimary,
-          title: 'Partner Challenge',
-          description: 'Complete 30 days with a friend for extra motivation',
-          duration: '30 days',
-          reward: '💎',
-        ),
-        const SizedBox(height: 12),
-        _buildAvailableChallengeCard(
-          theme,
-          icon: Icons.track_changes_outlined,
-          iconColor: AppColors.lightError,
-          title: 'Health Champion',
-          description: 'Track daily health improvements for 14 days',
-          duration: '14 days',
-          reward: '❤️',
-        ),
-        const SizedBox(height: 12),
-        _buildAvailableChallengeCard(
-          theme,
-          icon: Icons.savings_outlined,
-          iconColor: AppColors.lightWarning,
-          title: 'Money Saver',
-          description: 'Save \$100 by not buying cigarettes',
-          duration: 'Est. 20 days', // Example duration
-          reward: '💰',
-        ),
-        const SizedBox(height: 12),
-        // Re-use the Free Mode card from the Active tab
-        _buildFreeModeCard(theme),
-      ],
-    );
-  }
-
-  /// --- REPLACED: _buildAvailableChallengeItem with _buildAvailableChallengeCard ---
   Widget _buildAvailableChallengeCard(
-    ThemeData theme, {
-    required IconData icon,
-    required Color iconColor,
-    required String title,
-    required String description,
-    required String duration,
-    required String reward,
-  }) {
+    ThemeData theme,
+    Goal goal,
+    String userId,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -596,29 +551,26 @@ class _GoalsScreenState extends State<GoalsScreen> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Column for Icon and Duration
-              Column(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: iconColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(icon, color: iconColor, size: 26),
-                  ),
-                  const SizedBox(height: 8),
-                ],
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.lightSuccess.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.emoji_events_outlined,
+                  color: AppColors.lightSuccess,
+                  size: 26,
+                ),
               ),
               const SizedBox(width: 12),
-              // Title and Description
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      title,
+                      goal.title,
                       style: theme.textTheme.headlineSmall?.copyWith(
                         color: AppColors.lightTextPrimary,
                         fontWeight: FontWeight.w600,
@@ -627,7 +579,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      description,
+                      goal.description,
                       style: theme.textTheme.bodyMedium?.copyWith(fontSize: 13),
                       maxLines: 2,
                     ),
@@ -635,28 +587,41 @@ class _GoalsScreenState extends State<GoalsScreen> {
                 ),
               ),
               const SizedBox(width: 8),
-              // Reward Emoji
-              Text(
-                reward,
-                style: const TextStyle(fontSize: 20), // Larger emoji
-              ),
+              const Text('🏆', style: TextStyle(fontSize: 20)),
             ],
           ),
           const SizedBox(height: 12),
-          // Start Challenge Button
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                duration,
+                'Target: ${goal.targetValue} ${goal.unit}',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: AppColors.lightTextSecondary,
                   fontWeight: FontWeight.w500,
                 ),
               ),
               TextButton(
-                onPressed: () {
-                  // TODO: Handle Start Challenge
+                onPressed: () async {
+                  try {
+                    await _goalService.startGoal(goal, userId);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Started ${goal.title}!')),
+                      );
+                      setState(() {
+                        _selectedTabIndex = 0; // Switch to Active tab
+                      });
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Failed to start challenge: $e'),
+                        ),
+                      );
+                    }
+                  }
                 },
                 style: TextButton.styleFrom(
                   padding: EdgeInsets.zero,

@@ -2,11 +2,19 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:quit_habit/services/auth_service.dart';
 import 'package:quit_habit/services/user_service.dart';
+import 'package:quit_habit/services/app_usage_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
   final UserService _userService = UserService();
 
+  final AppUsageService _appUsageService = AppUsageService();
+
+  @override
+  void dispose() {
+    _appUsageService.dispose();
+    super.dispose();
+  }
   User? _user;
   bool _isLoading = true;
   bool _hasCompletedQuestionnaire = false;
@@ -26,9 +34,24 @@ class AuthProvider extends ChangeNotifier {
     _authService.authStateChanges.listen((User? user) async {
       _user = user;
       if (user != null) {
+        // Initialize App Usage Tracking
+        try {
+          // Guard against re-initialization by ensuring any previous session is cleaned up
+          _appUsageService.dispose();
+          _appUsageService.init(user.uid);
+        } catch (e) {
+          debugPrint('Error initializing AppUsageService: $e');
+        }
+        
         // Check questionnaire status from Firestore
         await _checkQuestionnaireStatus(user);
       } else {
+        // Stop App Usage Tracking
+        try {
+          _appUsageService.dispose();
+        } catch (e) {
+          debugPrint('Error disposing AppUsageService: $e');
+        }
         _hasCompletedQuestionnaire = false;
       }
       _isLoading = false;
@@ -206,6 +229,25 @@ class AuthProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       rethrow;
+    }
+  }
+
+  /// Refresh user data
+  Future<void> refreshUser() async {
+    if (_user != null) {
+      try {
+        await _user!.reload();
+        _user = _authService.currentUser;
+        if (_user == null) {
+          debugPrint('User session invalidated during refresh');
+          return;
+        }
+        await _checkQuestionnaireStatus(_user!);
+        notifyListeners();
+      } catch (e) {
+        debugPrint('Error refreshing user: $e');
+        rethrow;
+      }
     }
   }
 }

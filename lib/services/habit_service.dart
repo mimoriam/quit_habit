@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:quit_habit/models/habit_data.dart';
+import 'package:quit_habit/services/goal_service.dart';
 
 /// Custom exception for habit service errors
 class HabitServiceException implements Exception {
@@ -33,6 +35,8 @@ class HabitService {
 
   final CollectionReference _usersCollection =
       FirebaseFirestore.instance.collection('users');
+  
+  final Map<String, Timer> _goalCheckDebounceTimers = {};
 
   /// Get real-time stream of habit data for a user
   /// Returns a stream that combines user document data with relapsePeriods subcollection
@@ -76,6 +80,9 @@ class HabitService {
       onCancel: () {
         userSub?.cancel();
         relapseSub?.cancel();
+        // Cancel and remove the debounce timer for this user to prevent leaks
+        _goalCheckDebounceTimers[uid]?.cancel();
+        _goalCheckDebounceTimers.remove(uid);
       },
     );
 
@@ -110,6 +117,34 @@ class HabitService {
       habitData: habitData,
       relapsePeriods: relapsePeriods,
     ));
+
+    // Check and update duration goals
+    // We calculate the streak here to pass it
+    final currentStreak = getCurrentStreak(habitData, relapsePeriods);
+    
+    // Delegate to separate method with microtask to avoid side-effects in stream emission
+    Future.microtask(() => _scheduleGoalCheck(userSnapshot.id, currentStreak));
+  }
+
+  /// Schedule a goal check with debouncing to avoid race conditions
+  void _scheduleGoalCheck(String userId, int streak) {
+    _goalCheckDebounceTimers[userId]?.cancel();
+    
+    Timer? timer;
+    timer = Timer(const Duration(milliseconds: 500), () async {
+      try {
+        await GoalService.instance.checkDurationGoals(userId, streak);
+      } catch (e, stack) {
+        debugPrint('Failed to check duration goals: $e\n$stack');
+      } finally {
+        // Only remove if this is still the active timer
+        if (_goalCheckDebounceTimers[userId] == timer) {
+          _goalCheckDebounceTimers.remove(userId);
+        }
+      }
+    });
+    
+    _goalCheckDebounceTimers[userId] = timer;
   }
 
   /// Get relapse periods list for a user

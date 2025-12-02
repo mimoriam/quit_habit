@@ -4,6 +4,8 @@ import 'package:quit_habit/screens/navbar/tools/breathing/breathing_screen.dart'
 import 'package:quit_habit/screens/navbar/tools/inspiration/inspiration_quotes_screen.dart';
 import 'package:quit_habit/screens/navbar/tools/jumping_jacks/jumping_jacks_screen.dart';
 import 'package:quit_habit/screens/navbar/tools/meditation/meditation_screen.dart';
+import 'package:quit_habit/screens/navbar/tools/resources/resources_screen.dart';
+import 'package:quit_habit/screens/navbar/tools/mood/mood_screen.dart';
 import 'package:quit_habit/utils/app_colors.dart';
 
 // --- Local Colors for Tool Cards (from design) ---
@@ -201,6 +203,38 @@ class _ToolsScreenState extends State<ToolsScreen> {
             PersistentNavBarNavigator.pushNewScreen(
               context,
               screen: const InspirationQuotesScreen(),
+              withNavBar: false,
+              pageTransitionAnimation: PageTransitionAnimation.sizeUp,
+            );
+          },
+        ),
+        _ToolCard(
+          width: cardWidth,
+          icon: Icons.menu_book_rounded,
+          title: 'Resources',
+          subtitle: 'Learn & Grow',
+          iconColor: const Color(0xFF43A047), // Green
+          backgroundColor: const Color(0xFFE8F5E9),
+          onTap: () {
+            PersistentNavBarNavigator.pushNewScreen(
+              context,
+              screen: const ResourcesScreen(),
+              withNavBar: false,
+              pageTransitionAnimation: PageTransitionAnimation.sizeUp,
+            );
+          },
+        ),
+        _ToolCard(
+          width: cardWidth,
+          icon: Icons.mood_rounded,
+          title: 'Mood Check-in',
+          subtitle: 'Track feelings',
+          iconColor: const Color(0xFFFF9800), // Orange
+          backgroundColor: const Color(0xFFFFF3E0),
+          onTap: () {
+            PersistentNavBarNavigator.pushNewScreen(
+              context,
+              screen: const MoodScreen(),
               withNavBar: false,
               pageTransitionAnimation: PageTransitionAnimation.sizeUp,
             );

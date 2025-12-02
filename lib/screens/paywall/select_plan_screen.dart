@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:quit_habit/providers/auth_provider.dart';
 import 'package:quit_habit/screens/navbar/profile/subscription_status/subscription_status_screen.dart';
+import 'package:quit_habit/services/goal_service.dart';
+import 'package:quit_habit/services/user_service.dart';
 import 'package:quit_habit/utils/app_colors.dart';
 
 class SelectPlanScreen extends StatefulWidget {
@@ -12,6 +16,7 @@ class SelectPlanScreen extends StatefulWidget {
 class _SelectPlanScreenState extends State<SelectPlanScreen> {
   // Default to Yearly (Index 2) as per design
   int _selectedPlanIndex = 2;
+  bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -227,30 +232,81 @@ class _SelectPlanScreenState extends State<SelectPlanScreen> {
                     width: double.infinity,
                     height: 56,
                     child: ElevatedButton(
-                      onPressed: () {
-                        // Navigate to Dashboard
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => const SubscriptionStatusScreen()),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.lightPrimary,
-                        foregroundColor: AppColors.white,
-                        elevation: 4,
-                        shadowColor: AppColors.lightPrimary.withOpacity(0.4),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child: Text(
-                        "Subscribe Your Plan",
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                      onPressed: _isLoading
+                          ? null
+                          : () async {
+                              final authProvider = Provider.of<AuthProvider>(
+                                  context,
+                                  listen: false);
+                              final user = authProvider.user;
+
+                              if (user != null) {
+                                setState(() {
+                                  _isLoading = true;
+                                });
+                                try {
+                                  // 1. Upgrade User
+                                  await UserService().upgradeToPro(user.uid);
+
+                                  // Refresh user state to reflect pro status
+                                  await authProvider.refreshUser();
+
+                                  // 2. Check Goal
+                                  await GoalService().checkMilestoneGoals(
+                                      user.uid, 'pro_status');
+
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Welcome to Pro!'),
+                                        backgroundColor: AppColors.lightSuccess,
+                                      ),
+                                    );
+
+                                    // Navigate to Dashboard
+                                    Navigator.pushReplacement(
+                                      context,
+                                      MaterialPageRoute(
+                                          builder: (context) =>
+                                              const SubscriptionStatusScreen()),
+                                    );
+                                  }
+                                } catch (e) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content:
+                                            Text('Failed to subscribe: $e'),
+                                        backgroundColor: AppColors.lightError,
+                                      ),
+                                    );
+                                  }
+                                } finally {
+                                  if (context.mounted) {
+                                    setState(() {
+                                      _isLoading = false;
+                                    });
+                                  }
+                                }
+                              }
+                            },
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : Text(
+                              "Subscribe Your Plan",
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                     ),
                   ),
                 ),

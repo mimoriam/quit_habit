@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
 import 'package:provider/provider.dart';
+import 'package:quit_habit/models/goal.dart';
+import 'package:quit_habit/models/user_goal.dart';
 import 'package:quit_habit/providers/auth_provider.dart';
 import 'package:quit_habit/screens/navbar/chat/chat_onboarding_screen.dart';
 import 'package:quit_habit/screens/navbar/profile/my_data/my_data_screen.dart';
 import 'package:quit_habit/screens/navbar/profile/notifications/notifications_screen.dart';
+import 'package:quit_habit/screens/navbar/profile/invite_friends/invite_friends_screen.dart';
+import 'package:quit_habit/screens/navbar/profile/invite_friends/invites_list_screen.dart';
 import 'package:quit_habit/screens/paywall/success_rate_screen.dart';
 import 'package:quit_habit/services/user_service.dart';
 import 'package:quit_habit/services/habit_service.dart';
+import 'package:quit_habit/services/goal_service.dart';
 import 'package:quit_habit/utils/app_colors.dart';
 import 'package:quit_habit/widgets/auth_gate.dart';
 import 'package:intl/intl.dart';
@@ -325,17 +330,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ? habitService.getSuccessRate(habitData, relapsePeriods)
                       : 0.0;
 
-                  return IntrinsicHeight(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        _buildStatItem(theme, '$currentStreak', 'Day Streak'),
-                        const VerticalDivider(color: AppColors.lightBorder),
-                        _buildStatItem(theme, '2', 'Badges'),
-                        const VerticalDivider(color: AppColors.lightBorder),
-                        _buildStatItem(theme, '${successRate.toStringAsFixed(1)}%', 'Success'),
-                      ],
-                    ),
+                  return StreamBuilder<List<UserGoal>>(
+                    stream: GoalService().getUserCompletedGoals(user.uid),
+                    builder: (context, goalsSnapshot) {
+                      final badgeCount = goalsSnapshot.data?.length ?? 0;
+                      
+                      return IntrinsicHeight(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            _buildStatItem(theme, '$currentStreak', 'Day Streak'),
+                            const VerticalDivider(color: AppColors.lightBorder),
+                            _buildStatItem(theme, '$badgeCount', 'Badges'),
+                            const VerticalDivider(color: AppColors.lightBorder),
+                            _buildStatItem(theme, '${successRate.toStringAsFixed(1)}%', 'Success'),
+                          ],
+                        ),
+                      );
+                    }
                   );
                 },
               );
@@ -515,58 +527,102 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   /// Builds the "Badges" content (Tab 0)
   Widget _buildBadgesContent(ThemeData theme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Your Badges',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-                fontSize: 20,
-                color: AppColors.lightTextPrimary,
-              ),
-            ),
-            Text(
-              '2 of 6 earned',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppColors.lightTextSecondary,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        GridView.count(
-          crossAxisCount: 3,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          childAspectRatio: 0.85,
-          children: [
-            _buildBadgeItem(theme, 'First Week', 'Oct 13',
-                Icons.star_rounded, const Color(0xFFEF4444), true),
-            _buildBadgeItem(theme, 'Money Saver', 'Oct 15',
-                Icons.savings_rounded, const Color(0xFFF59E0B), true),
-            _buildBadgeItem(theme, 'Health Hero', null,
-                Icons.favorite_rounded, const Color(0xFFF472B6), false),
-            _buildBadgeItem(theme, 'One Month', null,
-                Icons.calendar_today_rounded, const Color(0xFFF59E0B), false),
-            _buildBadgeItem(theme, 'Team Player', null,
-                Icons.people_rounded, const Color(0xFF3B82F6), false),
-            _buildBadgeItem(theme, 'Champion', null, Icons.emoji_events_rounded,
-                const Color(0xFFF59E0B), false),
-          ],
-        ),
-      ],
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final user = authProvider.user;
+    final goalService = GoalService();
+
+    if (user == null) {
+      return const Center(child: Text('Please log in to view badges'));
+    }
+
+    return StreamBuilder<List<UserGoal>>(
+      stream: goalService.getUserCompletedGoals(user.uid),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final completedGoals = snapshot.data ?? [];
+        final earnedCount = completedGoals.length;
+
+        // We need to fetch all available goals to show unearned badges too, or just show earned ones.
+        // For a "Collection" feel, usually you show all slots.
+        // Let's fetch all available goals to map them.
+        return StreamBuilder<List<Goal>>(
+          stream: goalService.getAvailableGoalsFiltered(user.uid),
+          builder: (context, goalsSnapshot) {
+            if (!goalsSnapshot.hasData) {
+              return const SizedBox.shrink();
+            }
+
+            final allGoals = goalsSnapshot.data!;
+            
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Your Badges',
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 20,
+                        color: AppColors.lightTextPrimary,
+                      ),
+                    ),
+                    Text(
+                      '$earnedCount of ${allGoals.length} earned',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: AppColors.lightTextSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: 0.85,
+                  ),
+                  itemCount: allGoals.length,
+                  itemBuilder: (context, index) {
+                    final goal = allGoals[index];
+                    // Check if user has completed this goal
+                    final isEarned = completedGoals.any((ug) => ug.goalId == goal.id);
+                    final completedGoal = isEarned 
+                        ? completedGoals.firstWhere((ug) => ug.goalId == goal.id) 
+                        : null;
+                    
+                    final dateStr = completedGoal?.completedDate != null
+                        ? DateFormat('MMM d').format(completedGoal!.completedDate!)
+                        : null;
+
+                    return _buildBadgeItem(
+                      theme,
+                      isEarned ? completedGoal!.badgeName : goal.badgeName,
+                      dateStr,
+                      isEarned ? completedGoal!.badgeIcon : goal.badgeIcon,
+                      isEarned ? const Color(0xFFF59E0B) : AppColors.lightTextTertiary,
+                      isEarned,
+                    );
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
   Widget _buildBadgeItem(ThemeData theme, String title, String? date,
-      IconData icon, Color iconColor, bool isEarned) {
+      String? iconPath, Color iconColor, bool isEarned) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -588,12 +644,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon,
+          if (iconPath != null && iconPath.isNotEmpty)
+            Image.asset(
+              iconPath,
+              width: 32,
+              height: 32,
+              color: isEarned ? null : AppColors.lightTextTertiary,
+              errorBuilder: (context, error, stackTrace) => Icon(
+                Icons.emoji_events_rounded,
+                color: isEarned ? iconColor : AppColors.lightTextTertiary,
+                size: 32,
+              ),
+            )
+          else
+            Icon(
+              Icons.emoji_events_rounded,
               color: isEarned ? iconColor : AppColors.lightTextTertiary,
-              size: 32), // <--- CHANGED from 36
-          const SizedBox(height: 6), // <--- CHANGED from 8
+              size: 32,
+            ),
+          const SizedBox(height: 6),
           Text(
             title,
+            textAlign: TextAlign.center,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: isEarned
                   ? AppColors.lightTextPrimary
@@ -727,114 +799,123 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ? habitService.getSuccessRate(habitData, relapsePeriods)
                 : 0.0;
 
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Your Statistics',
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 20,
-                    color: AppColors.lightTextPrimary,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                // Stats Grid
-                GridView.count(
-                  crossAxisCount: 2,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 1.6,
+            final goalService = GoalService();
+
+            return StreamBuilder<List<UserGoal>>(
+              stream: goalService.getUserCompletedGoals(user.uid),
+              builder: (context, goalsSnapshot) {
+                final completedGoalsCount = goalsSnapshot.data?.length ?? 0;
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildStatGridItem(theme, '$totalDays', 'Total Days',
-                        Icons.calendar_today_rounded, const Color(0xFF22C55E)),
-                    _buildStatGridItem(theme, '2', 'Challenges',
-                        Icons.emoji_events_rounded, const Color(0xFF8B5CF6)),
-                    _buildStatGridItem(theme, '\$36', 'Money Saved',
-                        Icons.savings_rounded, const Color(0xFFF59E0B)),
-                    _buildStatGridItem(theme, '${successRate.toStringAsFixed(1)}%', 'Success Rate',
-                        Icons.track_changes_rounded, const Color(0xFFEF4444)),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                // 7-Day Progress
-                Text(
-                  '7-Day Progress',
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 20,
-                    color: AppColors.lightTextPrimary,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                  decoration: BoxDecoration(
-                    color: AppColors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.black.withOpacity(0.03),
-                        blurRadius: 10,
-                        offset: const Offset(0, 2),
+                    Text(
+                      'Your Statistics',
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 20,
+                        color: AppColors.lightTextPrimary,
                       ),
-                    ],
-                  ),
-                  child: Builder(
-                    builder: (context) {
-                      final weekStatuses = habitData != null && habitData.hasStartDate
-                          ? habitService.getWeeklyProgress(habitData, relapsePeriods)
-                          : List<String>.filled(7, 'not_started');
+                    ),
+                    const SizedBox(height: 12),
+                    // Stats Grid
+                    GridView.count(
+                      crossAxisCount: 2,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 1.6,
+                      children: [
+                        _buildStatGridItem(theme, '$totalDays', 'Total Days',
+                            Icons.calendar_today_rounded, const Color(0xFF22C55E)),
+                        _buildStatGridItem(theme, '$completedGoalsCount', 'Challenges',
+                            Icons.emoji_events_rounded, const Color(0xFF8B5CF6)),
+                        _buildStatGridItem(theme, '\$36', 'Money Saved',
+                            Icons.savings_rounded, const Color(0xFFF59E0B)),
+                        _buildStatGridItem(theme, '${successRate.toStringAsFixed(1)}%', 'Success Rate',
+                            Icons.track_changes_rounded, const Color(0xFFEF4444)),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // 7-Day Progress
+                    Text(
+                      '7-Day Progress',
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 20,
+                        color: AppColors.lightTextPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                      decoration: BoxDecoration(
+                        color: AppColors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.black.withOpacity(0.03),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Builder(
+                        builder: (context) {
+                          final weekStatuses = habitData != null && habitData.hasStartDate
+                              ? habitService.getWeeklyProgress(habitData, relapsePeriods)
+                              : List<String>.filled(7, 'not_started');
 
-                      // Get current week days (Monday to Sunday)
-                      final today = DateTime.now();
-                      final weekday = today.weekday; // 1 = Monday, 7 = Sunday
-                      final daysFromMonday = weekday - 1;
-                      final monday = DateTime(today.year, today.month, today.day)
-                          .subtract(Duration(days: daysFromMonday));
+                          // Get current week days (Monday to Sunday)
+                          final today = DateTime.now();
+                          final weekday = today.weekday; // 1 = Monday, 7 = Sunday
+                          final daysFromMonday = weekday - 1;
+                          final monday = DateTime(today.year, today.month, today.day)
+                              .subtract(Duration(days: daysFromMonday));
 
-                      final weekDays = <String>[];
-                      final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                          final weekDays = <String>[];
+                          final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-                      for (int i = 0; i < 7; i++) {
-                        weekDays.add(dayNames[i]);
-                      }
-
-                      return Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: List.generate(7, (index) {
-                          final dayName = weekDays[index];
-                          final status = weekStatuses[index];
-                          final dayDate = monday.add(Duration(days: index));
-                          final todayNormalized =
-                              DateTime(today.year, today.month, today.day);
-                          final dayNormalized =
-                              DateTime(dayDate.year, dayDate.month, dayDate.day);
-                          final isToday = dayNormalized == todayNormalized;
-
-                          // Map status to display status
-                          String displayStatus;
-                          if (status == 'not_started') {
-                            displayStatus = 'not_started'; // Show "..."
-                          } else if (status == 'relapse') {
-                            displayStatus = 'missed'; // Show X
-                          } else if (status == 'clean') {
-                            displayStatus = 'done'; // Show checkmark
-                          } else if (isToday && status != 'relapse') {
-                            displayStatus = 'pending'; // Show pending icon
-                          } else {
-                            displayStatus = 'future'; // Show empty circle
+                          for (int i = 0; i < 7; i++) {
+                            weekDays.add(dayNames[i]);
                           }
 
-                          return _WeekDay(day: dayName, status: displayStatus);
-                        }),
-                      );
-                    },
-                  ),
-                ),
-              ],
+                          return Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: List.generate(7, (index) {
+                              final dayName = weekDays[index];
+                              final status = weekStatuses[index];
+                              final dayDate = monday.add(Duration(days: index));
+                              final todayNormalized =
+                                  DateTime(today.year, today.month, today.day);
+                              final dayNormalized =
+                                  DateTime(dayDate.year, dayDate.month, dayDate.day);
+                              final isToday = dayNormalized == todayNormalized;
+
+                              // Map status to display status
+                              String displayStatus;
+                              if (status == 'not_started') {
+                                displayStatus = 'not_started'; // Show "..."
+                              } else if (status == 'relapse') {
+                                displayStatus = 'missed'; // Show X
+                              } else if (status == 'clean') {
+                                displayStatus = 'done'; // Show checkmark
+                              } else if (isToday && status != 'relapse') {
+                                displayStatus = 'pending'; // Show pending icon
+                              } else {
+                                displayStatus = 'future'; // Show empty circle
+                              }
+
+                              return _WeekDay(day: dayName, status: displayStatus);
+                            }),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              }
             );
           },
         );
@@ -898,49 +979,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        _buildSettingTile(
-          theme,
-          'Why is smoking harmful?',
-          '',
-          Icons.warning_amber_rounded,
-          const Color(0xFFEF4444),
-          onTap: () {},
+        const ExpandableLearnTile(
+          title: 'Why is smoking harmful?',
+          content: 'Smoking damages nearly every organ in your body. It causes lung cancer, heart disease, stroke, and lung diseases like COPD. It also increases the risk of tuberculosis, certain eye diseases, and problems with the immune system.',
+          icon: Icons.warning_amber_rounded,
+          iconColor: Color(0xFFEF4444),
         ),
-        const SizedBox(height: 8),
-        _buildSettingTile(
-          theme,
-          'Health benefits of quitting',
-          '',
-          Icons.favorite_rounded,
-          const Color(0xFFEC4899),
-          onTap: () {},
+        const ExpandableLearnTile(
+          title: 'Health benefits of quitting',
+          content: 'Within 20 minutes, your heart rate and blood pressure drop. In 12 hours, the carbon monoxide level in your blood drops to normal. In 2-12 weeks, your circulation improves and your lung function increases. In 1-9 months, coughing and shortness of breath decrease.',
+          icon: Icons.favorite_rounded,
+          iconColor: Color(0xFFEC4899),
         ),
-        const SizedBox(height: 8),
-        _buildSettingTile(
-          theme,
-          'Understanding nicotine addiction',
-          '',
-          Icons.psychology_rounded,
-          const Color(0xFF8B5CF6),
-          onTap: () {},
+        const ExpandableLearnTile(
+          title: 'Understanding nicotine addiction',
+          content: 'Nicotine is a highly addictive chemical found in the tobacco plant. It reaches the brain within seconds of inhaling cigarette smoke. It causes the release of dopamine, which gives a feeling of pleasure. Over time, your brain changes and you need more nicotine to feel okay.',
+          icon: Icons.psychology_rounded,
+          iconColor: Color(0xFF8B5CF6),
         ),
-        const SizedBox(height: 8),
-        _buildSettingTile(
-          theme,
-          'Tips for handling cravings',
-          '',
-          Icons.lightbulb_rounded,
-          const Color(0xFFF59E0B),
-          onTap: () {},
+        const ExpandableLearnTile(
+          title: 'Tips for handling cravings',
+          content: '1. Delay: Wait 10 minutes.\n2. Deep breathe.\n3. Drink water.\n4. Do something else to distract yourself.\n5. Discuss with a friend or support group.\nRemember, cravings usually last only a few minutes.',
+          icon: Icons.lightbulb_rounded,
+          iconColor: Color(0xFFF59E0B),
         ),
-        const SizedBox(height: 8),
-        _buildSettingTile(
-          theme,
-          'Success stories',
-          '',
-          Icons.auto_stories_rounded,
-          const Color(0xFF22C55E),
-          onTap: () {},
+        const ExpandableLearnTile(
+          title: 'Success stories',
+          content: 'Meet Sarah, who quit after 15 years of smoking. "It was hard at first, but taking it one day at a time helped. Now I can run a 5k without getting winded!" Join our community to read more inspiring stories.',
+          icon: Icons.auto_stories_rounded,
+          iconColor: Color(0xFF22C55E),
         ),
       ],
     );
@@ -981,6 +1048,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
             PersistentNavBarNavigator.pushNewScreen(
               context,
               screen: const NotificationsScreen(),
+              withNavBar: false,
+              pageTransitionAnimation: PageTransitionAnimation.cupertino,
+            );
+          },
+        ),
+        const SizedBox(height: 8),
+        _buildSettingTile(
+          theme,
+          'Invite Friends',
+          'Invite friends to quit together',
+          Icons.share_rounded,
+          const Color(0xFF8B5CF6), // Purple
+          onTap: () {
+            PersistentNavBarNavigator.pushNewScreen(
+              context,
+              screen: const InviteFriendsScreen(),
+              withNavBar: false,
+              pageTransitionAnimation: PageTransitionAnimation.cupertino,
+            );
+          },
+        ),
+        const SizedBox(height: 8),
+        _buildSettingTile(
+          theme,
+          'My Invites',
+          'View sent and received invites',
+          Icons.mail_outline_rounded,
+          const Color(0xFFEC4899), // Pink
+          onTap: () {
+            PersistentNavBarNavigator.pushNewScreen(
+              context,
+              screen: const InvitesListScreen(),
               withNavBar: false,
               pageTransitionAnimation: PageTransitionAnimation.cupertino,
             );
@@ -1328,6 +1427,94 @@ class _WeekDay extends StatelessWidget {
           child: Center(child: icon),
         ),
       ],
+    );
+  }
+}
+
+class ExpandableLearnTile extends StatefulWidget {
+  final String title;
+  final String subtitle;
+  final String content;
+  final IconData icon;
+  final Color iconColor;
+
+  const ExpandableLearnTile({
+    super.key,
+    required this.title,
+    this.subtitle = '',
+    required this.content,
+    required this.icon,
+    required this.iconColor,
+  });
+
+  @override
+  State<ExpandableLearnTile> createState() => _ExpandableLearnTileState();
+}
+
+class _ExpandableLearnTileState extends State<ExpandableLearnTile> {
+  bool _isExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          onExpansionChanged: (expanded) {
+            setState(() {
+              _isExpanded = expanded;
+            });
+          },
+          leading: Icon(widget.icon, color: widget.iconColor, size: 26),
+          title: Text(
+            widget.title,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+              fontSize: 16,
+              color: AppColors.lightTextPrimary,
+            ),
+          ),
+          subtitle: widget.subtitle.isNotEmpty
+              ? Text(
+                  widget.subtitle,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: AppColors.lightTextSecondary,
+                    fontSize: 13,
+                  ),
+                )
+              : null,
+          trailing: Icon(
+            _isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+            size: 24,
+            color: AppColors.lightTextTertiary.withOpacity(0.5),
+          ),
+          children: [
+            Text(
+              widget.content,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: AppColors.lightTextSecondary,
+                height: 1.5,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

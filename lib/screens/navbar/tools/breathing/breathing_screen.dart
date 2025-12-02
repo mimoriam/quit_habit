@@ -1,4 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:quit_habit/models/goal.dart';
+import 'package:quit_habit/providers/auth_provider.dart';
+import 'package:quit_habit/services/goal_service.dart';
 import 'package:quit_habit/utils/app_colors.dart';
 
 class BreathingScreen extends StatefulWidget {
@@ -9,10 +14,91 @@ class BreathingScreen extends StatefulWidget {
 }
 
 class _BreathingScreenState extends State<BreathingScreen> {
-  // TODO: Add animation/timer logic
-  // For now, this is the static UI from the screenshot
-  final String _currentState = "Breathe In";
-  final String _currentCount = "4";
+  // Breathing Logic
+  Timer? _timer;
+  int _cycleCount = 0;
+  bool _isActive = false;
+  String _currentState = "Breathe In";
+  String _currentCount = "4";
+  
+  // 4-4-6 Pattern
+  // 0-3: Inhale (4s)
+  // 4-7: Hold (4s)
+  // 8-13: Exhale (6s)
+  int _tick = 0;
+  final int _totalTicks = 14;
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _startBreathing() {
+    if (_isActive) return;
+
+    setState(() {
+      _isActive = true;
+      _cycleCount = 0;
+      _tick = 0;
+      _updateStateText();
+    });
+
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setState(() {
+        _tick++;
+        if (_tick >= _totalTicks) {
+          _tick = 0;
+          _cycleCount++;
+        }
+        _updateStateText();
+      });
+    });
+  }
+
+  Future<void> _stopBreathing() async {
+    _timer?.cancel();
+    setState(() {
+      _isActive = false;
+      _currentState = "Breathe In";
+      _currentCount = "4";
+    });
+
+    // If user completed at least one cycle, count it as progress
+    if (_cycleCount >= 1) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final user = authProvider.user;
+      if (user != null) {
+        try {
+          await GoalService().updateProgressForType(user.uid, GoalType.exercise);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Great job! Progress updated.')),
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Failed to update progress. Please try again.')),
+            );
+          }
+        }
+      }
+    }
+  }
+
+  void _updateStateText() {
+    if (_tick < 4) {
+      _currentState = "Breathe In";
+      _currentCount = "${4 - _tick}";
+    } else if (_tick < 8) {
+      _currentState = "Hold";
+      _currentCount = "${8 - _tick}";
+    } else {
+      _currentState = "Breathe Out";
+      _currentCount = "${14 - _tick}";
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,9 +107,10 @@ class _BreathingScreenState extends State<BreathingScreen> {
     return Scaffold(
       backgroundColor: AppColors.lightBackground,
       appBar: AppBar(
+        // ... existing app bar code ...
         backgroundColor: AppColors.lightBackground,
         elevation: 0,
-        automaticallyImplyLeading: false, // No back arrow
+        automaticallyImplyLeading: false, 
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -59,7 +146,10 @@ class _BreathingScreenState extends State<BreathingScreen> {
                 size: 20,
               ),
             ),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () async {
+               if (_isActive) await _stopBreathing();
+               if (context.mounted) Navigator.pop(context);
+            },
           ),
           const SizedBox(width: 16),
         ],
@@ -70,33 +160,29 @@ class _BreathingScreenState extends State<BreathingScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const SizedBox(height: 32), // Compacted from 48
+              const SizedBox(height: 32), 
               // 1. Breathing Circle (Now a Stack)
               Stack(
                 alignment: Alignment.center,
                 children: [
-                  // --- MODIFIED: Outer circle color ---
-                  // New Outer, larger, more transparent circle (drawn first = "underneath")
-                  Container(
-                    width: 280, // Compacted from 300
-                    height: 280, // Compacted from 300
+                  // Outer circle
+                  AnimatedContainer(
+                    duration: const Duration(seconds: 1),
+                    width: _isActive && _currentState == "Breathe In" ? 300 : 280,
+                    height: _isActive && _currentState == "Breathe In" ? 300 : 280,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: AppColors.lightPrimary.withAlpha(
-                        15, // Was 10. Made slightly more opaque.
-                      ), // More transparent
+                      color: AppColors.lightPrimary.withAlpha(15), 
                     ),
                   ),
-                  // --- MODIFIED: Inner circle now uses a solid color instead of gradient ---
-                  // Original Inner Circle
-                  Container(
-                    width: 240, // Compacted from 260
-                    height: 240, // Compacted from 260
+                  // Inner Circle
+                  AnimatedContainer(
+                     duration: const Duration(seconds: 1),
+                    width: _isActive && _currentState == "Breathe In" ? 260 : 240,
+                    height: _isActive && _currentState == "Breathe In" ? 260 : 240,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      // Replaced RadialGradient with a solid, semi-transparent color
-                      // to match the screenshot.
-                      color: AppColors.lightPrimary.withAlpha(30), // ~12% opacity
+                      color: AppColors.lightPrimary.withAlpha(30), 
                     ),
                     child: Center(
                       child: Column(
@@ -105,7 +191,7 @@ class _BreathingScreenState extends State<BreathingScreen> {
                           Text(
                             _currentCount,
                             style: theme.textTheme.displayLarge?.copyWith(
-                              fontSize: 80, // Compacted from 96
+                              fontSize: 80, 
                               fontWeight: FontWeight.w300,
                               color: AppColors.lightPrimary,
                             ),
@@ -115,7 +201,7 @@ class _BreathingScreenState extends State<BreathingScreen> {
                             style: theme.textTheme.headlineSmall?.copyWith(
                               color: AppColors.lightPrimary,
                               fontWeight: FontWeight.w500,
-                              fontSize: 18, // Compacted from 20
+                              fontSize: 18, 
                             ),
                           ),
                         ],
@@ -125,41 +211,41 @@ class _BreathingScreenState extends State<BreathingScreen> {
                 ],
               ),
 
-              const SizedBox(height: 40), // Compacted from 48
+              const SizedBox(height: 40), 
               // 2. Info Box
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
-                  vertical: 12, // Compacted from 14
+                  vertical: 12, 
                 ),
                 decoration: BoxDecoration(
                   color: AppColors.lightPrimary.withAlpha(20),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  'Follow the breathing pattern to calm your mind and reduce cravings',
+                  _isActive 
+                    ? 'Completed cycles: $_cycleCount' 
+                    : 'Follow the breathing pattern to calm your mind and reduce cravings',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: AppColors.lightPrimary.withAlpha(229),
                     fontWeight: FontWeight.w500,
-                    height: 1.4, // Tighter line height
+                    height: 1.4, 
                   ),
                 ),
               ),
 
               const SizedBox(height: 24),
 
-              // 3. Start Button
+              // 3. Start/Stop Button
               SizedBox(
-                width: 200, // Match Meditation screen button width
-                height: 50, // Compacted from 52
+                width: 200, 
+                height: 50, 
                 child: ElevatedButton(
-                  onPressed: () {
-                    // TODO: Implement breathing animation logic
-                  },
+                  onPressed: _isActive ? _stopBreathing : _startBreathing,
                   style: theme.elevatedButtonTheme.style?.copyWith(
                     backgroundColor: WidgetStateProperty.all(
-                      AppColors.lightPrimary,
+                      _isActive ? AppColors.lightTextSecondary : AppColors.lightPrimary,
                     ),
                     shape: WidgetStateProperty.all(
                       RoundedRectangleBorder(
@@ -170,14 +256,14 @@ class _BreathingScreenState extends State<BreathingScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(
-                        Icons.play_arrow_rounded,
+                      Icon(
+                        _isActive ? Icons.stop_rounded : Icons.play_arrow_rounded,
                         color: AppColors.white,
                         size: 26,
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        'Start',
+                        _isActive ? 'Stop' : 'Start',
                         style: theme.textTheme.labelLarge?.copyWith(
                           fontSize: 17,
                           fontWeight: FontWeight.w600,

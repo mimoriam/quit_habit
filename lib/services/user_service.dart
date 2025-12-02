@@ -89,5 +89,36 @@ class UserService {
       throw Exception('Failed to update user document: ${e.toString()}');
     }
   }
+  /// Upgrade user to Pro
+  Future<void> upgradeToPro(String uid) async {
+    try {
+      final userRef = _usersCollection.doc(uid);
+      
+      await FirebaseFirestore.instance.runTransaction((transaction) async {
+        final snapshot = await transaction.get(userRef);
+        
+        if (!snapshot.exists) {
+          throw Exception('User document does not exist');
+        }
+        
+        final userData = snapshot.data() as Map<String, dynamic>;
+        final isPro = userData['isPro'] == true;
+        
+        final Map<String, dynamic> updates = {
+          'isPro': true,
+          'updatedAt': FieldValue.serverTimestamp(),
+        };
+        
+        // Only set proSince if not already a pro user
+        if (!isPro) {
+          updates['proSince'] = FieldValue.serverTimestamp();
+        }
+        
+        transaction.update(userRef, updates);
+      });
+    } catch (e) {
+      throw Exception('Failed to upgrade user to Pro: ${e.toString()}');
+    }
+  }
 }
 
