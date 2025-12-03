@@ -1,16 +1,132 @@
+import 'dart:async';
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
+import 'package:provider/provider.dart';
+import 'package:quit_habit/models/community_post.dart';
+import 'package:quit_habit/providers/auth_provider.dart';
 import 'package:quit_habit/screens/navbar/common/common_header.dart';
 import 'package:quit_habit/screens/navbar/community/add_post/add_post_screen.dart';
 import 'package:quit_habit/screens/navbar/community/post_comment/post_comment_screen.dart';
+import 'package:quit_habit/services/community_service.dart';
+import 'package:quit_habit/services/invite_service.dart';
 import 'package:quit_habit/utils/app_colors.dart';
 
-class CommunityHomeScreen extends StatelessWidget {
+class CommunityHomeScreen extends StatefulWidget {
   const CommunityHomeScreen({super.key});
+
+  @override
+  State<CommunityHomeScreen> createState() => _CommunityHomeScreenState();
+}
+
+class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
+  final CommunityService _communityService = CommunityService();
+  final ScrollController _scrollController = ScrollController();
+  
+  // State
+  List<CommunityPost> _posts = [];
+  List<String> _likedPostIds = [];
+  bool _isLoading = true;
+  String? _error;
+  int _limit = 20;
+  bool _isLoadingMore = false;
+  
+  // Subscriptions
+  StreamSubscription<List<CommunityPost>>? _postsSubscription;
+  StreamSubscription<List<String>>? _likesSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _setupStreams();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _postsSubscription?.cancel();
+    _likesSubscription?.cancel();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _setupStreams() {
+    final authProvider = context.read<AuthProvider>();
+    final user = authProvider.user;
+    
+    if (user == null) return;
+
+    // Subscribe to posts
+    _subscribeToPosts();
+
+    // Subscribe to likes
+    _likesSubscription = _communityService.getLikedPostIdsStream(user.uid).listen(
+      (likedIds) {
+        if (mounted) {
+          setState(() {
+            _likedPostIds = likedIds;
+          });
+        }
+      },
+      onError: (e) {
+        debugPrint('Error fetching likes: $e');
+      },
+    );
+  }
+
+  void _subscribeToPosts() {
+    _postsSubscription?.cancel();
+    _postsSubscription = _communityService.getPostsStream(limit: _limit).listen(
+      (posts) {
+        if (mounted) {
+          setState(() {
+            _posts = posts;
+            _isLoading = false;
+            _isLoadingMore = false;
+            _error = null;
+          });
+        }
+      },
+      onError: (e) {
+        if (mounted) {
+          setState(() {
+            _error = e.toString();
+            _isLoading = false;
+            _isLoadingMore = false;
+          });
+        }
+      },
+    );
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      if (!_isLoading && !_isLoadingMore) {
+        _loadMore();
+      }
+    }
+  }
+
+  void _loadMore() {
+    setState(() {
+      _isLoadingMore = true;
+      _limit += 20;
+    });
+    _subscribeToPosts();
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final authProvider = context.watch<AuthProvider>();
+    final user = authProvider.user;
+
+    if (user == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Scaffold(
       backgroundColor: AppColors.lightBackground,
@@ -19,7 +135,7 @@ class CommunityHomeScreen extends StatelessWidget {
           PersistentNavBarNavigator.pushNewScreen(
             context,
             screen: const AddPostScreen(),
-            withNavBar: false, // Hide nav bar on the add post screen
+            withNavBar: false,
             pageTransitionAnimation: PageTransitionAnimation.cupertino,
           );
         },
@@ -28,364 +144,311 @@ class CommunityHomeScreen extends StatelessWidget {
         shape: const CircleBorder(),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 16),
-                const CommonHeader(),
-                const SizedBox(height: 24),
-
-                // --- Community Posts List ---
-                ListView(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          child: CustomScrollView(
+            controller: _scrollController,
+            slivers: [
+              const SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildPostCard(
-                      context: context, // Pass context
-                      theme: theme,
-                      initials: 'SJ',
-                      name: 'Sarah Johnson',
-                      time: '2 hours ago',
-                      supportCount: 30,
-                      commentCount: 2,
-                      likeCount: 124,
-                      postText:
-                          'Just completed my first month smoke-free! 🎉 The breathing exercises really helped during tough moments. Stay strong everyone!',
-                      avatarColor: AppColors.lightSecondary.withOpacity(0.1),
-                      avatarTextColor: AppColors.lightSecondary,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildPostCard(
-                      context: context, // Pass context
-                      theme: theme,
-                      initials: 'MR',
-                      name: 'Mike Roberts',
-                      time: '4 hours ago',
-                      supportCount: 5,
-                      commentCount: 2,
-                      likeCount: 45,
-                      postText:
-                          'The cravings are intense. Anyone for getting through the afternoon slump?',
-                      avatarColor: AppColors.lightTextTertiary.withOpacity(0.1),
-                      avatarTextColor: AppColors.lightTextTertiary,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildPostCard(
-                      context: context, // Pass context
-                      theme: theme,
-                      initials: 'MR',
-                      name: 'Mike Roberts',
-                      time: '4 hours ago',
-                      supportCount: 5,
-                      commentCount: 2,
-                      likeCount: 45,
-                      postText:
-                          'The cravings are intense. Anyone for getting through the afternoon slump?',
-                      avatarColor: AppColors.lightTextTertiary.withOpacity(0.1),
-                      avatarTextColor: AppColors.lightTextTertiary,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildPostCard(
-                      context: context, // Pass context
-                      theme: theme,
-                      initials: 'MR',
-                      name: 'Mike Roberts',
-                      time: '4 hours ago',
-                      supportCount: 5,
-                      commentCount: 2,
-                      likeCount: 45,
-                      postText:
-                          'The cravings are intense. Anyone for getting through the afternoon slump?',
-                      avatarColor: AppColors.lightTextTertiary.withOpacity(0.1),
-                      avatarTextColor: AppColors.lightTextTertiary,
-                    ),
+                    SizedBox(height: 16),
+                    CommonHeader(),
+                    SizedBox(height: 16),
                   ],
                 ),
-                const SizedBox(height: 24),
-                _buildLoadMoreButton(theme),
-                const SizedBox(height: 80), // Padding for FAB
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+              ),
+              
+              if (_isLoading && _posts.isEmpty)
+                const SliverFillRemaining(
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_error != null && _posts.isEmpty)
+                SliverFillRemaining(
+                  child: Center(child: Text('Error: $_error')),
+                )
+              else if (_posts.isEmpty)
+                const SliverFillRemaining(
+                  child: Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24.0),
+                      child: Text('No posts yet. Be the first to share!'),
+                    ),
+                  ),
+                )
+              else
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      if (index == _posts.length) {
+                        return _isLoadingMore
+                            ? const Padding(
+                                padding: EdgeInsets.all(16.0),
+                                child: Center(child: CircularProgressIndicator()),
+                              )
+                            : const SizedBox(height: 80); // Bottom padding for FAB
+                      }
+                      
+                      final post = _posts[index];
+                      final isLiked = _likedPostIds.contains(post.id);
+                      final postWithLikeStatus = post.copyWith(
+                        isLikedByMe: isLiked,
+                      );
 
-  /// Builds the top header (copied from home_screen.dart for consistency)
-  Widget _buildHeader(ThemeData theme) {
-    return Row(
-      children: [
-        _buildStatBadge(
-          theme,
-          icon: Icons.health_and_safety_outlined,
-          label: '0%',
-          bgColor: AppColors.badgeGreen,
-          iconColor: AppColors.lightSuccess,
-        ),
-        const SizedBox(width: 8),
-        _buildStatBadge(
-          theme,
-          icon: Icons.diamond_outlined,
-          label: '1',
-          bgColor: AppColors.badgeBlue,
-          iconColor: AppColors.lightPrimary,
-        ),
-        const SizedBox(width: 8),
-        _buildStatBadge(
-          theme,
-          icon: Icons.monetization_on_outlined,
-          label: '0',
-          bgColor: AppColors.badgeOrange,
-          iconColor: AppColors.lightWarning,
-        ),
-        const Spacer(),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: AppColors.lightWarning,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.workspace_premium_outlined,
-                color: AppColors.white,
-                size: 16,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                'Pro',
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: AppColors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _CommunityPostCard(
+                          post: postWithLikeStatus,
+                          theme: theme,
+                        ),
+                      );
+                    },
+                    childCount: _posts.length + 1, // +1 for loader/padding
+                  ),
                 ),
-              ),
             ],
           ),
         ),
-      ],
-    );
-  }
-
-  /// Helper for the small stat badges (copied from home_screen.dart)
-  Widget _buildStatBadge(
-    ThemeData theme, {
-    required IconData icon,
-    required String label,
-    required Color bgColor,
-    required Color iconColor,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: iconColor, size: 16),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: AppColors.lightTextPrimary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
       ),
     );
   }
+}
 
-  /// Builds a single community post card
-  Widget _buildPostCard({
-    required BuildContext context, // Add context
-    required ThemeData theme,
-    required String initials,
-    required String name,
-    required String time,
-    required int supportCount,
-    required int commentCount,
-    required int likeCount,
-    required String postText,
-    required Color avatarColor,
-    required Color avatarTextColor,
-  }) {
-    // --- Wrap with GestureDetector for navigation ---
+class _CommunityPostCard extends StatefulWidget {
+  final CommunityPost post;
+  final ThemeData theme;
+
+  const _CommunityPostCard({
+    required this.post,
+    required this.theme,
+  });
+
+  @override
+  State<_CommunityPostCard> createState() => _CommunityPostCardState();
+}
+
+class _CommunityPostCardState extends State<_CommunityPostCard> {
+  final InviteService _inviteService = InviteService();
+  final CommunityService _communityService = CommunityService();
+  
+  Map<String, dynamic>? _userInfo;
+  bool _isLoadingUser = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserInfo();
+  }
+
+  Future<void> _fetchUserInfo() async {
+    if (mounted) {
+      final info = await _inviteService.getUserBasicInfo(widget.post.userId);
+      if (mounted) {
+        setState(() {
+          _userInfo = info;
+          _isLoadingUser = false;
+        });
+      }
+    }
+  }
+
+  String _getTimeAgo(DateTime timestamp) {
+    final now = DateTime.now();
+    final difference = now.difference(timestamp);
+
+    if (difference.inDays > 7) {
+      return '${timestamp.day}/${timestamp.month}/${timestamp.year}';
+    } else if (difference.inDays >= 1) {
+      return '${difference.inDays}d ago';
+    } else if (difference.inHours >= 1) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inMinutes >= 1) {
+      return '${difference.inMinutes}m ago';
+    } else {
+      return 'Just now';
+    }
+  }
+
+  void _handleLike() {
+    final authProvider = context.read<AuthProvider>();
+    final user = authProvider.user;
+    if (user == null) return;
+
+    _communityService.toggleLike(
+      widget.post.id,
+      user.uid,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final userName = _userInfo?['fullName'] ?? 'User';
+    final initials = userName.isNotEmpty ? userName.substring(0, min(2, userName.length)).toUpperCase() : 'U';
+    // Generate a consistent color based on user ID or name
+    final avatarColor = AppColors.lightPrimary.withOpacity(0.1);
+    final avatarTextColor = AppColors.lightPrimary;
+
     return GestureDetector(
       onTap: () {
         PersistentNavBarNavigator.pushNewScreen(
           context,
-          screen: PostCommentScreen(
-            // Pass the data for this post
-            initials: initials,
-            name: name,
-            time: time,
-            supportCount: supportCount,
-            commentCount: commentCount,
-            likeCount: likeCount,
-            postText: postText,
-            avatarColor: avatarColor,
-            avatarTextColor: avatarTextColor,
-          ),
-          withNavBar: false, // Hide nav bar on the comment screen
+          screen: PostCommentScreen(post: widget.post),
+          withNavBar: false,
           pageTransitionAnimation: PageTransitionAnimation.cupertino,
         );
       },
-      // --- FIXED: Restored Container properties ---
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           color: AppColors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.lightBorder, width: 1.5),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.lightBorder, width: 1),
         ),
-        // --- FIXED: Added child Column ---
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 CircleAvatar(
-                  radius: 24,
+                  radius: 18,
                   backgroundColor: avatarColor,
-                  child: Text(
-                    initials,
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      color: avatarTextColor,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  child: _isLoadingUser
+                      ? const SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(
+                          initials,
+                          style: widget.theme.textTheme.labelLarge?.copyWith(
+                            color: avatarTextColor,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              _isLoadingUser ? 'Loading...' : userName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: widget.theme.textTheme.bodyMedium?.copyWith(
+                                color: AppColors.lightTextPrimary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '• ${_getTimeAgo(widget.post.timestamp)}',
+                            style: widget.theme.textTheme.bodySmall?.copyWith(
+                              color: AppColors.lightTextSecondary,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: AppColors.lightTextPrimary,
-                        fontWeight: FontWeight.w600,
-                      ),
+                if (widget.post.streakDays > 0)
+                  Container(
+                    margin: const EdgeInsets.only(left: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
                     ),
-                    Text(
-                      time,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: AppColors.lightTextSecondary,
-                      ),
+                    decoration: BoxDecoration(
+                      color: AppColors.badgeOrange,
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                  ],
-                ),
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.local_fire_department_rounded,
+                          color: AppColors.lightWarning,
+                          size: 12,
+                        ),
+                        const SizedBox(width: 2),
+                        Text(
+                          widget.post.streakDays.toString(),
+                          style: widget.theme.textTheme.labelSmall?.copyWith(
+                            color: AppColors.lightWarning,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  decoration: BoxDecoration(
-                    color: AppColors.badgeOrange,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              widget.post.text,
+              style: widget.theme.textTheme.bodyMedium?.copyWith(
+                color: AppColors.lightTextSecondary,
+                height: 1.3,
+                fontSize: 13,
+              ),
+            ),
+            const Divider(height: 16, color: AppColors.lightBorder),
+            Row(
+              children: [
+                GestureDetector(
+                  onTap: _handleLike,
                   child: Row(
                     children: [
-                      const Icon(
-                        Icons.local_fire_department_rounded,
-                        color: AppColors.lightWarning,
-                        size: 16,
+                      Icon(
+                        widget.post.isLikedByMe ? Icons.favorite : Icons.favorite_border,
+                        color: widget.post.isLikedByMe ? AppColors.lightError : AppColors.lightTextSecondary,
+                        size: 18,
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        supportCount.toString(),
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: AppColors.lightWarning,
-                          fontWeight: FontWeight.w700,
+                        widget.post.likesCount.toString(),
+                        style: widget.theme.textTheme.labelSmall?.copyWith(
+                          color: AppColors.lightTextSecondary,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
                   ),
                 ),
+                const SizedBox(width: 16),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.chat_bubble_outline_rounded,
+                      color: AppColors.lightTextSecondary,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      widget.post.commentsCount.toString(),
+                      style: widget.theme.textTheme.labelSmall?.copyWith(
+                        color: AppColors.lightTextSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
               ],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              postText,
-              style: theme.textTheme.bodyLarge?.copyWith(
-                color: AppColors.lightTextSecondary,
-                fontSize: 15,
-                height: 1.4,
-              ),
-            ),
-            const Divider(height: 32, color: AppColors.lightBorder),
-            _buildPostActions(
-              theme: theme,
-              likeCount: likeCount,
-              commentCount: commentCount,
             ),
           ],
         ),
       ),
     );
   }
-
-  /// Builds the action row (likes, comments) for a post
-  Widget _buildPostActions({
-    required ThemeData theme,
-    required int likeCount,
-    required int commentCount,
-  }) {
-    return Row(
-      children: [
-        Icon(
-          Icons.favorite_border,
-          color: AppColors.lightTextSecondary,
-          size: 20,
-        ),
-        const SizedBox(width: 6),
-        Text(
-          likeCount.toString(),
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: AppColors.lightTextSecondary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(width: 24),
-        Icon(
-          Icons.chat_bubble_outline_rounded,
-          color: AppColors.lightTextSecondary,
-          size: 20,
-        ),
-        const SizedBox(width: 6),
-        Text(
-          commentCount.toString(),
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: AppColors.lightTextSecondary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// Builds the "Load More Posts" button
-  Widget _buildLoadMoreButton(ThemeData theme) {
-    return Center(
-      child: TextButton(
-        onPressed: () {
-          // TODO: Handle loading more posts
-        },
-        child: Text(
-          'Load More Posts',
-          style: theme.textTheme.labelLarge?.copyWith(
-            color: AppColors.lightPrimary,
-            fontSize: 15,
-          ),
-        ),
-      ),
-    );
+  
+  int min(int a, int b) {
+    return a < b ? a : b;
   }
 }

@@ -1,30 +1,22 @@
+import 'dart:async';
+import 'dart:math';
+
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:quit_habit/models/community_comment.dart';
+import 'package:quit_habit/models/community_post.dart';
+import 'package:quit_habit/providers/auth_provider.dart';
 import 'package:quit_habit/screens/navbar/common/common_header.dart';
+import 'package:quit_habit/services/community_service.dart';
+import 'package:quit_habit/services/invite_service.dart';
 import 'package:quit_habit/utils/app_colors.dart';
 
 class PostCommentScreen extends StatefulWidget {
-  // Data passed from the community screen
-  final String initials;
-  final String name;
-  final String time;
-  final int supportCount;
-  final int commentCount;
-  final int likeCount;
-  final String postText;
-  final Color avatarColor;
-  final Color avatarTextColor;
+  final CommunityPost post;
 
   const PostCommentScreen({
     super.key,
-    required this.initials,
-    required this.name,
-    required this.time,
-    required this.supportCount,
-    required this.commentCount,
-    required this.likeCount,
-    required this.postText,
-    required this.avatarColor,
-    required this.avatarTextColor,
+    required this.post,
   });
 
   @override
@@ -33,11 +25,122 @@ class PostCommentScreen extends StatefulWidget {
 
 class _PostCommentScreenState extends State<PostCommentScreen> {
   final TextEditingController _commentController = TextEditingController();
+  final CommunityService _communityService = CommunityService();
+  final InviteService _inviteService = InviteService();
+  final ScrollController _scrollController = ScrollController();
+
+  // State
+  List<CommunityComment> _comments = [];
+  bool _isLoading = true;
+  bool _isSending = false;
+  bool _isLoadingMore = false;
+  String? _error;
+  int _limit = 20;
+  Map<String, dynamic>? _postUserInfo;
+  
+  // Subscriptions
+  StreamSubscription<List<CommunityComment>>? _commentsSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchPostUserInfo();
+    _setupCommentsStream();
+    _scrollController.addListener(_onScroll);
+  }
 
   @override
   void dispose() {
     _commentController.dispose();
+    _commentsSubscription?.cancel();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchPostUserInfo() async {
+    if (mounted) {
+      final info = await _inviteService.getUserBasicInfo(widget.post.userId);
+      if (mounted) {
+        setState(() {
+          _postUserInfo = info;
+        });
+      }
+    }
+  }
+
+  void _setupCommentsStream() {
+    _commentsSubscription?.cancel();
+    _commentsSubscription = _communityService.getCommentsStream(widget.post.id, limit: _limit).listen(
+      (comments) {
+        if (mounted) {
+          setState(() {
+            _comments = comments;
+            _isLoading = false;
+            _isLoadingMore = false;
+            _error = null;
+          });
+        }
+      },
+      onError: (e) {
+        if (mounted) {
+          setState(() {
+            _error = e.toString();
+            _isLoading = false;
+            _isLoadingMore = false;
+          });
+        }
+      },
+    );
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      if (!_isLoading && !_isLoadingMore) {
+        _loadMore();
+      }
+    }
+  }
+
+  void _loadMore() {
+    setState(() {
+      _isLoadingMore = true;
+      _limit += 20;
+    });
+    _setupCommentsStream();
+  }
+
+  Future<void> _handleSendComment() async {
+    final text = _commentController.text.trim();
+    if (text.isEmpty) return;
+
+    setState(() => _isSending = true);
+
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final user = authProvider.user;
+      if (user == null) return;
+
+      await _communityService.addComment(
+        postId: widget.post.id,
+        userId: user.uid,
+        text: text,
+      );
+
+      if (mounted) {
+        _commentController.clear();
+        FocusScope.of(context).unfocus();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error sending comment: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSending = false);
+      }
+    }
   }
 
   @override
@@ -46,80 +149,105 @@ class _PostCommentScreenState extends State<PostCommentScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.lightBackground,
-      // --- REMOVED: appBar property ---
-      // appBar: AppBar(
-      //   backgroundColor: AppColors.lightBackground,
-      //   elevation: 0,
-      //   leading: IconButton(
-      //     icon: const Icon(Icons.arrow_back_ios_new,
-      //         color: AppColors.lightTextPrimary),
-      //     onPressed: () => Navigator.pop(context),
-      //   ),
-      //   title: Text(
-      //     'Comments',
-      //     style: theme.textTheme.headlineMedium
-      //         ?.copyWith(fontWeight: FontWeight.w700, fontSize: 20),
-      //   ),
-      //   centerTitle: true,
-      // ),
-      // --- Sticky bottom input field ---
       bottomNavigationBar: _buildCommentInputField(theme),
-      body: SingleChildScrollView(
-        // --- WRAP with SafeArea for the top status bar ---
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // --- MOVED: Header with badges is now at the top of the body ---
-                const SizedBox(height: 16),
-                const CommonHeader(),
-                const SizedBox(height: 16),
-                // --- ADDED: New custom AppBar ---
-                _buildAppBar(context, theme),
-                const SizedBox(height: 24),
-                // --- Original Post ---
-                _buildOriginalPostCard(theme),
-
-                // ), // <--- THIS WAS THE ERROR (Removed parenthesis)
-                const SizedBox(height: 16),
-                // --- Comments List ---
-                ListView(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          child: CustomScrollView(
+            controller: _scrollController,
+            slivers: [
+              SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildCommentCard(
-                      // --- FIXED: Added theme argument ---
-                      theme: theme,
-                      initials: 'JD',
-                      name: 'John Davis',
-                      time: '1 hour ago',
-                      commentText:
-                          'This is so inspiring! Congratulations on your achievement! 🎉',
-                    ),
                     const SizedBox(height: 16),
-                    _buildCommentCard(
-                      theme: theme,
-                      initials: 'JD',
-                      name: 'John Davis',
-                      // --- FIXED: Added time argument ---
-                      time: '1 hour ago',
-                      commentText:
-                          'This is so inspiring! Congratulations on your achievement! 🎉',
+                    const CommonHeader(),
+                    const SizedBox(height: 16),
+                    _buildAppBar(context, theme),
+                    const SizedBox(height: 16),
+                    _buildOriginalPostCard(theme),
+                    const SizedBox(height: 24),
+                    
+                    // --- Comments Section Header ---
+                    Row(
+                      children: [
+                        Text(
+                          'Comments',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.lightTextPrimary,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.lightPrimary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            widget.post.commentsCount.toString(),
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: AppColors.lightPrimary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
+                    const SizedBox(height: 12),
                   ],
                 ),
-                const SizedBox(height: 24), // Bottom padding
-              ], // <--- CORRECTED: Parenthesis moved here
-            ),
+              ),
+
+              if (_isLoading && _comments.isEmpty)
+                const SliverFillRemaining(
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_error != null && _comments.isEmpty)
+                SliverFillRemaining(
+                  child: Center(child: Text('Error: $_error')),
+                )
+              else if (_comments.isEmpty)
+                const SliverFillRemaining(
+                  child: Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24.0),
+                      child: Text('No comments yet.'),
+                    ),
+                  ),
+                )
+              else
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      if (index == _comments.length) {
+                        return _isLoadingMore
+                            ? const Padding(
+                                padding: EdgeInsets.all(16.0),
+                                child: Center(child: CircularProgressIndicator()),
+                              )
+                            : const SizedBox(height: 24); // Bottom padding
+                      }
+                      
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _CommentCard(
+                          comment: _comments[index],
+                          theme: theme,
+                        ),
+                      );
+                    },
+                    childCount: _comments.length + 1,
+                  ),
+                ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  // --- ADDED: New method for the custom AppBar ---
   Widget _buildAppBar(BuildContext context, ThemeData theme) {
     return Row(
       children: [
@@ -137,107 +265,23 @@ class _PostCommentScreenState extends State<PostCommentScreen> {
             ),
           ),
         ),
-        // --- ADDED: Spacer to balance the IconButton and center the title correctly ---
         const SizedBox(width: 48.0),
       ],
     );
   }
 
-  /// Builds the top header (copied from home_screen.dart for consistency)
-  Widget _buildHeader(ThemeData theme) {
-    return Row(
-      children: [
-        _buildStatBadge(
-          theme,
-          icon: Icons.health_and_safety_outlined,
-          label: '0%',
-          bgColor: AppColors.badgeGreen,
-          iconColor: AppColors.lightSuccess,
-        ),
-        const SizedBox(width: 8),
-        _buildStatBadge(
-          theme,
-          icon: Icons.diamond_outlined,
-          label: '1',
-          bgColor: AppColors.badgeBlue,
-          iconColor: AppColors.lightPrimary,
-        ),
-        const SizedBox(width: 8),
-        _buildStatBadge(
-          theme,
-          icon: Icons.monetization_on_outlined,
-          label: '0',
-          bgColor: AppColors.badgeOrange,
-          iconColor: AppColors.lightWarning,
-        ),
-        const Spacer(),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: AppColors.lightWarning,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.workspace_premium_outlined,
-                color: AppColors.white,
-                size: 16,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                'Pro',
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: AppColors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// Helper for the small stat badges (copied from home_screen.dart)
-  Widget _buildStatBadge(
-    ThemeData theme, {
-    required IconData icon,
-    required String label,
-    required Color bgColor,
-    required Color iconColor,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: iconColor, size: 16),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: AppColors.lightTextPrimary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Builds the original post card (modified from community_home_screen.dart)
   Widget _buildOriginalPostCard(ThemeData theme) {
+    final userName = _postUserInfo?['fullName'] ?? 'User';
+    final initials = userName.isNotEmpty ? userName.substring(0, min(2, userName.length)).toUpperCase() : 'U';
+    final avatarColor = AppColors.lightPrimary.withOpacity(0.1);
+    final avatarTextColor = AppColors.lightPrimary;
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16), // Compact padding
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.lightBorder, width: 1.5),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.lightBorder, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -245,142 +289,72 @@ class _PostCommentScreenState extends State<PostCommentScreen> {
           Row(
             children: [
               CircleAvatar(
-                radius: 24,
-                backgroundColor: widget.avatarColor,
+                radius: 20, // Compact avatar
+                backgroundColor: avatarColor,
                 child: Text(
-                  widget.initials,
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    color: widget.avatarTextColor,
+                  initials,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: avatarTextColor,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    widget.name,
-                    style: theme.textTheme.bodyLarge?.copyWith(
+                    userName,
+                    style: theme.textTheme.bodyMedium?.copyWith(
                       color: AppColors.lightTextPrimary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   Text(
-                    widget.time,
-                    style: theme.textTheme.bodyMedium?.copyWith(
+                    _getTimeAgo(widget.post.timestamp),
+                    style: theme.textTheme.bodySmall?.copyWith(
                       color: AppColors.lightTextSecondary,
                     ),
                   ),
                 ],
               ),
               const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.badgeOrange,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.local_fire_department_rounded,
-                      color: AppColors.lightWarning,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      widget.supportCount.toString(),
-                      style: theme.textTheme.labelMedium?.copyWith(
+              if (widget.post.streakDays > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.badgeOrange,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.local_fire_department_rounded,
                         color: AppColors.lightWarning,
-                        fontWeight: FontWeight.w700,
+                        size: 14,
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            widget.postText,
-            style: theme.textTheme.bodyLarge?.copyWith(
-              color: AppColors.lightTextSecondary,
-              fontSize: 15,
-              height: 1.4,
-            ),
-          ),
-          // --- No divider or actions in this version ---
-        ],
-      ),
-    );
-  }
-
-  /// Builds a single comment card
-  Widget _buildCommentCard({
-    required ThemeData theme,
-    required String initials,
-    required String name,
-    required String time,
-    required String commentText,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.lightBorder, width: 1.5),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: AppColors.lightTextTertiary.withOpacity(0.1),
-            child: Text(
-              initials,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                color: AppColors.lightTextTertiary,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      name,
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: AppColors.lightTextPrimary,
-                        fontWeight: FontWeight.w600,
+                      const SizedBox(width: 4),
+                      Text(
+                        widget.post.streakDays.toString(),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: AppColors.lightWarning,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      time,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: AppColors.lightTextSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  commentText,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: AppColors.lightTextSecondary,
-                    fontSize: 15,
-                    height: 1.4,
+                    ],
                   ),
                 ),
-              ],
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            widget.post.text,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: AppColors.lightTextSecondary,
+              height: 1.3,
             ),
           ),
         ],
@@ -388,14 +362,13 @@ class _PostCommentScreenState extends State<PostCommentScreen> {
     );
   }
 
-  /// Builds the sticky comment input field for the bottom navigation bar
   Widget _buildCommentInputField(ThemeData theme) {
     return Container(
       padding: EdgeInsets.fromLTRB(
         24.0,
         12.0,
         24.0,
-        12.0 + MediaQuery.of(context).viewInsets.bottom, // Handles keyboard
+        12.0 + MediaQuery.of(context).viewInsets.bottom,
       ),
       color: AppColors.white,
       child: Row(
@@ -403,19 +376,19 @@ class _PostCommentScreenState extends State<PostCommentScreen> {
           Expanded(
             child: TextField(
               controller: _commentController,
-              style: theme.textTheme.bodyLarge?.copyWith(
+              style: theme.textTheme.bodyMedium?.copyWith(
                 color: AppColors.lightTextPrimary,
               ),
               decoration: InputDecoration(
                 hintText: 'Add a comment...',
-                hintStyle: theme.textTheme.bodyLarge?.copyWith(
+                hintStyle: theme.textTheme.bodyMedium?.copyWith(
                   color: AppColors.lightTextTertiary,
                 ),
                 filled: true,
                 fillColor: AppColors.lightBackground,
                 contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 14,
+                  horizontal: 16,
+                  vertical: 10,
                 ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -434,21 +407,179 @@ class _PostCommentScreenState extends State<PostCommentScreen> {
           ),
           const SizedBox(width: 12),
           ElevatedButton(
-            onPressed: () {
-              // TODO: Handle send comment
-            },
+            onPressed: _isSending ? null : _handleSendComment,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.lightPrimary,
               foregroundColor: AppColors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
-              padding: const EdgeInsets.all(16),
-              // --- THIS LINE FIXES THE ERROR ---
-              // Override the theme's minimumSize.width of double.infinity
-              minimumSize: const Size(0, 50),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              minimumSize: const Size(0, 40),
             ),
-            child: const Text('Send'),
+            child: _isSending
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.white,
+                    ),
+                  )
+                : const Text('Send'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getTimeAgo(DateTime timestamp) {
+    final now = DateTime.now();
+    final difference = now.difference(timestamp);
+
+    if (difference.inDays > 7) {
+      return '${timestamp.day}/${timestamp.month}/${timestamp.year}';
+    } else if (difference.inDays >= 1) {
+      return '${difference.inDays}d ago';
+    } else if (difference.inHours >= 1) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inMinutes >= 1) {
+      return '${difference.inMinutes}m ago';
+    } else {
+      return 'Just now';
+    }
+  }
+  
+  int min(int a, int b) {
+    return a < b ? a : b;
+  }
+}
+
+class _CommentCard extends StatefulWidget {
+  final CommunityComment comment;
+  final ThemeData theme;
+
+  const _CommentCard({
+    required this.comment,
+    required this.theme,
+  });
+
+  @override
+  State<_CommentCard> createState() => _CommentCardState();
+}
+
+class _CommentCardState extends State<_CommentCard> {
+  final InviteService _inviteService = InviteService();
+  Map<String, dynamic>? _userInfo;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserInfo();
+  }
+
+  Future<void> _fetchUserInfo() async {
+    if (mounted) {
+      final info = await _inviteService.getUserBasicInfo(widget.comment.userId);
+      if (mounted) {
+        setState(() {
+          _userInfo = info;
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  String _getTimeAgo(DateTime timestamp) {
+    final now = DateTime.now();
+    final difference = now.difference(timestamp);
+
+    if (difference.inDays > 7) {
+      return '${timestamp.day}/${timestamp.month}/${timestamp.year}';
+    } else if (difference.inDays >= 1) {
+      return '${difference.inDays}d ago';
+    } else if (difference.inHours >= 1) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inMinutes >= 1) {
+      return '${difference.inMinutes}m ago';
+    } else {
+      return 'Just now';
+    }
+  }
+  
+  int min(int a, int b) {
+    return a < b ? a : b;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final userName = _userInfo?['fullName'] ?? 'User';
+    final initials = userName.isNotEmpty ? userName.substring(0, min(2, userName.length)).toUpperCase() : 'U';
+
+    return Container(
+      padding: const EdgeInsets.all(12), // Compact padding for comments
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.lightBorder, width: 1),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 16, // Smaller avatar for comments
+            backgroundColor: AppColors.lightTextTertiary.withOpacity(0.1),
+            child: _isLoading
+                ? const SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Text(
+                    initials,
+                    style: widget.theme.textTheme.labelLarge?.copyWith(
+                      color: AppColors.lightTextTertiary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      _isLoading ? 'Loading...' : userName,
+                      style: widget.theme.textTheme.bodyMedium?.copyWith(
+                        color: AppColors.lightTextPrimary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _getTimeAgo(widget.comment.timestamp),
+                      style: widget.theme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.lightTextSecondary,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  widget.comment.text,
+                  style: widget.theme.textTheme.bodyMedium?.copyWith(
+                    color: AppColors.lightTextSecondary,
+                    fontSize: 13,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
