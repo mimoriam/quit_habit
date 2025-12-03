@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:quit_habit/services/goal_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:synchronized/synchronized.dart';
 
 class AppUsageService with WidgetsBindingObserver {
   static final AppUsageService _instance = AppUsageService._internal();
@@ -11,9 +12,10 @@ class AppUsageService with WidgetsBindingObserver {
   DateTime? _lastCheckTime;
   Timer? _saveTimer;
   String? _userId;
+  bool _isInitialized = false;
+  bool get isInitialized => _isInitialized;
 
-
-  Completer<void>? _saveLock;
+  final _lock = Lock();
 
   void init(String userId) {
     // Cleanup existing resources to prevent duplicates
@@ -24,20 +26,22 @@ class AppUsageService with WidgetsBindingObserver {
     _userId = userId;
     _lastCheckTime = DateTime.now();
     WidgetsBinding.instance.addObserver(this);
+    _isInitialized = true;
     
     // Start periodic save timer (every 5 minutes as requested)
-    _saveTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
-      _accumulateAndCheck();
+    _saveTimer = Timer.periodic(const Duration(minutes: 5), (timer) async {
+      await _accumulateAndCheck();
     });
   }
 
-  void dispose() {
+  Future<void> dispose() async {
+    _isInitialized = false;
     WidgetsBinding.instance.removeObserver(this);
     _saveTimer?.cancel();
     _saveTimer = null;
     
     try {
-      _accumulateAndCheck(); // Final save (fire and forget)
+      await _accumulateAndCheck(); // Final save (awaited)
     } catch (e) {
       debugPrint('Error saving app usage on dispose: $e');
     }
@@ -59,29 +63,38 @@ class AppUsageService with WidgetsBindingObserver {
   }
 
   Future<void> _accumulateAndCheck() async {
-    final userId = _userId; // Capture locally to avoid race conditions
-    if (userId == null || _lastCheckTime == null) return;
+    int? newTotal;
+    String? currentUserId;
 
-    final now = DateTime.now();
-    final duration = now.difference(_lastCheckTime!);
-    final minutesToAdd = (duration.inSeconds / 60).round();
+    await _lock.synchronized(() async {
+      final userId = _userId; // Capture locally to avoid race conditions
+      if (userId == null || _lastCheckTime == null) return;
 
-    if (minutesToAdd > 0) {
-      await _addToDailyTotal(minutesToAdd, userId);
-      _lastCheckTime = now; // Only advance checkpoint after successful save
+      final now = DateTime.now();
+      final duration = now.difference(_lastCheckTime!);
+      final minutesToAdd = (duration.inSeconds / 60).round();
+
+      if (minutesToAdd > 0) {
+        // Perform SharedPreferences update inside lock to ensure atomicity of the counter
+        newTotal = await _updateDailyUsagePrefs(minutesToAdd, userId);
+        if (newTotal != null) {
+          _lastCheckTime = now; // Only advance checkpoint after successful save
+          currentUserId = userId;
+        }
+      }
+    });
+
+    // Call GoalService outside the lock to prevent deadlocks and blocking
+    if (newTotal != null && currentUserId != null) {
+      try {
+        await GoalService().checkFunctionalityGoals(currentUserId!, newTotal!);
+      } catch (e) {
+        debugPrint('Error checking functionality goals: $e');
+      }
     }
   }
 
-  Future<void> _addToDailyTotal(int minutes, [String? userIdOverride]) async {
-    final userId = userIdOverride ?? _userId;
-    if (userId == null) return;
-
-    // Wait for any ongoing save operation
-    while (_saveLock != null) {
-      await _saveLock!.future;
-    }
-    _saveLock = Completer<void>();
-
+  Future<int?> _updateDailyUsagePrefs(int minutes, String userId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final today = DateTime.now().toIso8601String().split('T')[0];
@@ -91,14 +104,10 @@ class AppUsageService with WidgetsBindingObserver {
       int newTotal = currentTotal + minutes;
 
       await prefs.setInt(key, newTotal);
-
-      // Check goals
-      await GoalService().checkFunctionalityGoals(userId, newTotal);
+      return newTotal;
     } catch (e) {
       debugPrint('Error adding to daily total: $e');
-    } finally {
-      _saveLock!.complete();
-      _saveLock = null;
+      return null;
     }
   }
 }

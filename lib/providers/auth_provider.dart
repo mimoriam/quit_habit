@@ -37,7 +37,9 @@ class AuthProvider extends ChangeNotifier {
         // Initialize App Usage Tracking
         try {
           // Guard against re-initialization by ensuring any previous session is cleaned up
-          _appUsageService.dispose();
+          if (_appUsageService.isInitialized) {
+            await _appUsageService.dispose();
+          }
           _appUsageService.init(user.uid);
         } catch (e) {
           debugPrint('Error initializing AppUsageService: $e');
@@ -48,7 +50,9 @@ class AuthProvider extends ChangeNotifier {
       } else {
         // Stop App Usage Tracking
         try {
-          _appUsageService.dispose();
+          if (_appUsageService.isInitialized) {
+            await _appUsageService.dispose();
+          }
         } catch (e) {
           debugPrint('Error disposing AppUsageService: $e');
         }
