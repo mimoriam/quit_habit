@@ -6,7 +6,8 @@ import 'package:provider/provider.dart';
 import 'package:quit_habit/models/community_comment.dart';
 import 'package:quit_habit/models/community_post.dart';
 import 'package:quit_habit/providers/auth_provider.dart';
-import 'package:quit_habit/screens/navbar/common/common_header.dart';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:quit_habit/services/community_service.dart';
 import 'package:quit_habit/services/invite_service.dart';
 import 'package:quit_habit/utils/app_colors.dart';
@@ -25,6 +26,7 @@ class PostCommentScreen extends StatefulWidget {
 
 class _PostCommentScreenState extends State<PostCommentScreen> {
   final TextEditingController _commentController = TextEditingController();
+  final FocusNode _commentFocusNode = FocusNode();
   final CommunityService _communityService = CommunityService();
   final InviteService _inviteService = InviteService();
   final ScrollController _scrollController = ScrollController();
@@ -34,25 +36,31 @@ class _PostCommentScreenState extends State<PostCommentScreen> {
   bool _isLoading = true;
   bool _isSending = false;
   bool _isLoadingMore = false;
+  bool _hasMore = true;
   String? _error;
-  int _limit = 20;
   Map<String, dynamic>? _postUserInfo;
+  CommunityComment? _replyingTo;
+  final Map<String, Map<String, dynamic>> _userCache = {};
+  CommunityComment? _lastPagedComment;
   
   // Subscriptions
-  StreamSubscription<List<CommunityComment>>? _commentsSubscription;
+  StreamSubscription<List<CommunityComment>>? _newCommentsSubscription;
+  late Stream<CommunityPost?> _postStream;
 
   @override
   void initState() {
     super.initState();
     _fetchPostUserInfo();
-    _setupCommentsStream();
+    _postStream = _communityService.getPostStream(widget.post.id);
+    _fetchInitialComments();
     _scrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
     _commentController.dispose();
-    _commentsSubscription?.cancel();
+    _commentFocusNode.dispose();
+    _newCommentsSubscription?.cancel();
     _scrollController.dispose();
     super.dispose();
   }
@@ -68,29 +76,60 @@ class _PostCommentScreenState extends State<PostCommentScreen> {
     }
   }
 
-  void _setupCommentsStream() {
-    _commentsSubscription?.cancel();
-    _commentsSubscription = _communityService.getCommentsStream(widget.post.id, limit: _limit).listen(
-      (comments) {
-        if (mounted) {
-          setState(() {
-            _comments = comments;
-            _isLoading = false;
-            _isLoadingMore = false;
-            _error = null;
-          });
+  Future<void> _fetchInitialComments() async {
+    final boundaryTimestamp = Timestamp.now();
+    try {
+      final comments = await _communityService.getComments(
+        postId: widget.post.id,
+        limit: 20,
+      );
+      
+      if (mounted) {
+        setState(() {
+          _comments = comments;
+          if (comments.isNotEmpty) {
+            _lastPagedComment = comments.last;
+          }
+          _isLoading = false;
+          _hasMore = comments.length >= 20;
+        });
+        
+        // Use the boundary timestamp to ensure we don't miss comments added during the fetch
+        // If we fetched comments, we can also use the last comment's timestamp if it's newer than boundary
+        // but boundary is safer to avoid gaps if the fetch didn't get everything.
+        // Actually, if we use boundary (start of fetch), we cover everything after start.
+        // Duplicates are filtered in the listener.
+        _setupNewCommentsListener(boundaryTimestamp);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _setupNewCommentsListener(Timestamp startAfter) {
+    _newCommentsSubscription?.cancel();
+    _newCommentsSubscription = _communityService.getNewCommentsStream(
+      postId: widget.post.id,
+      afterTimestamp: startAfter,
+    ).listen((newComments) {
+      if (newComments.isEmpty) return;
+      
+      if (mounted) {
+        // Filter out duplicates
+        final uniqueNew = newComments.where((nc) => !_comments.any((c) => c.id == nc.id)).toList();
+        
+        if (uniqueNew.isNotEmpty) {
+           setState(() {
+             _comments.addAll(uniqueNew);
+           });
         }
-      },
-      onError: (e) {
-        if (mounted) {
-          setState(() {
-            _error = e.toString();
-            _isLoading = false;
-            _isLoadingMore = false;
-          });
-        }
-      },
-    );
+      }
+    });
   }
 
   void _onScroll() {
@@ -101,12 +140,42 @@ class _PostCommentScreenState extends State<PostCommentScreen> {
     }
   }
 
-  void _loadMore() {
-    setState(() {
-      _isLoadingMore = true;
-      _limit += 20;
-    });
-    _setupCommentsStream();
+  Future<void> _loadMore() async {
+    if (_isLoadingMore || !_hasMore || _lastPagedComment == null) return;
+    
+    setState(() => _isLoadingMore = true);
+    
+    try {
+      final comments = await _communityService.getComments(
+        postId: widget.post.id,
+        startAfter: [_lastPagedComment!.timestamp, _lastPagedComment!.id],
+        limit: 20,
+      );
+      
+      if (mounted) {
+        setState(() {
+          if (comments.isEmpty) {
+            _hasMore = false;
+          } else {
+            // Insert after the last paged comment
+            final index = _comments.indexOf(_lastPagedComment!);
+            if (index != -1) {
+              _comments.insertAll(index + 1, comments);
+            } else {
+              _comments.addAll(comments);
+            }
+            
+            _lastPagedComment = comments.last;
+            if (comments.length < 20) _hasMore = false;
+          }
+          _isLoadingMore = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingMore = false);
+      }
+    }
   }
 
   Future<void> _handleSendComment() async {
@@ -120,14 +189,60 @@ class _PostCommentScreenState extends State<PostCommentScreen> {
       final user = authProvider.user;
       if (user == null) return;
 
-      await _communityService.addComment(
+      String? parentId;
+      String? replyToUserId;
+
+      if (_replyingTo != null) {
+        // If replying to a reply, the parentId is the original comment's ID (or parentId if it has one)
+        // We want a flat structure for replies (1 level deep)
+        parentId = _replyingTo!.parentId ?? _replyingTo!.id;
+        replyToUserId = _replyingTo!.userId;
+      }
+
+      final commentId = await _communityService.addComment(
         postId: widget.post.id,
         userId: user.uid,
         text: text,
+        parentId: parentId,
+        replyToUserId: replyToUserId,
       );
 
       if (mounted) {
         _commentController.clear();
+        
+        // Only optimistically add top-level comments
+        if (parentId == null) {
+          final newComment = CommunityComment(
+            id: commentId,
+            userId: user.uid,
+            text: text,
+            timestamp: DateTime.now(),
+            parentId: null,
+            replyToUserId: null,
+            replyCount: 0,
+          );
+          
+          setState(() {
+            _comments.add(newComment);
+            _replyingTo = null;
+          });
+          
+          // Scroll to bottom to show new comment
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (_scrollController.hasClients) {
+              _scrollController.animateTo(
+                _scrollController.position.maxScrollExtent,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOut,
+              );
+            }
+          });
+        } else {
+          setState(() {
+            _replyingTo = null;
+          });
+        }
+        
         FocusScope.of(context).unfocus();
       }
     } catch (e) {
@@ -161,39 +276,56 @@ class _PostCommentScreenState extends State<PostCommentScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 16),
-                    const CommonHeader(),
-                    const SizedBox(height: 16),
+                    // Removed CommonHeader as requested
+                    // const CommonHeader(),
+                    // const SizedBox(height: 16),
                     _buildAppBar(context, theme),
                     const SizedBox(height: 16),
                     _buildOriginalPostCard(theme),
                     const SizedBox(height: 24),
                     
                     // --- Comments Section Header ---
-                    Row(
-                      children: [
-                        Text(
-                          'Comments',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.lightTextPrimary,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.lightPrimary.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            widget.post.commentsCount.toString(),
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: AppColors.lightPrimary,
-                              fontWeight: FontWeight.w700,
+                    StreamBuilder<CommunityPost?>(
+                      stream: _postStream,
+                      initialData: widget.post,
+                      builder: (context, snapshot) {
+                        if (snapshot.hasData && snapshot.data == null) {
+                           // Post deleted
+                           WidgetsBinding.instance.addPostFrameCallback((_) {
+                             if (mounted) Navigator.pop(context);
+                           });
+                           return const SizedBox.shrink();
+                        }
+
+                        final post = snapshot.data ?? widget.post;
+                        
+                        return Row(
+                          children: [
+                            Text(
+                              'Comments',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.lightTextPrimary,
+                              ),
                             ),
-                          ),
-                        ),
-                      ],
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.lightPrimary.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                post.commentsCount.toString(),
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: AppColors.lightPrimary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      }
                     ),
                     const SizedBox(height: 12),
                   ],
@@ -235,6 +367,15 @@ class _PostCommentScreenState extends State<PostCommentScreen> {
                         child: _CommentCard(
                           comment: _comments[index],
                           theme: theme,
+                          postId: widget.post.id,
+                          userCache: _userCache,
+                          replyingToId: _replyingTo?.id,
+                          onReply: (comment) {
+                            setState(() {
+                              _replyingTo = comment;
+                            });
+                            _commentFocusNode.requestFocus();
+                          },
                         ),
                       );
                     },
@@ -371,11 +512,35 @@ class _PostCommentScreenState extends State<PostCommentScreen> {
         12.0 + MediaQuery.of(context).viewInsets.bottom,
       ),
       color: AppColors.white,
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (_replyingTo != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8.0, left: 4.0),
+              child: Row(
+                children: [
+                  Text(
+                    'Replying to comment...',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppColors.lightTextSecondary,
+                    ),
+                  ),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () => setState(() => _replyingTo = null),
+                    child: const Icon(Icons.close, size: 16, color: AppColors.lightTextSecondary),
+                  ),
+                ],
+              ),
+            ),
+          Row(
+            children: [
           Expanded(
             child: TextField(
               controller: _commentController,
+              focusNode: _commentFocusNode,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: AppColors.lightTextPrimary,
               ),
@@ -428,6 +593,8 @@ class _PostCommentScreenState extends State<PostCommentScreen> {
                   )
                 : const Text('Send'),
           ),
+            ],
+          ),
         ],
       ),
     );
@@ -458,10 +625,18 @@ class _PostCommentScreenState extends State<PostCommentScreen> {
 class _CommentCard extends StatefulWidget {
   final CommunityComment comment;
   final ThemeData theme;
+  final String postId;
+  final Map<String, Map<String, dynamic>> userCache;
+  final Function(CommunityComment) onReply;
+  final String? replyingToId;
 
   const _CommentCard({
     required this.comment,
     required this.theme,
+    required this.postId,
+    required this.userCache,
+    required this.onReply,
+    this.replyingToId,
   });
 
   @override
@@ -470,25 +645,83 @@ class _CommentCard extends StatefulWidget {
 
 class _CommentCardState extends State<_CommentCard> {
   final InviteService _inviteService = InviteService();
+  final CommunityService _communityService = CommunityService();
+  
   Map<String, dynamic>? _userInfo;
-  bool _isLoading = true;
+  bool _isLoadingUser = true;
+  bool _showReplies = false;
+  List<CommunityComment> _replies = [];
+  bool _isLoadingReplies = false;
+  StreamSubscription<List<CommunityComment>>? _repliesSubscription;
 
   @override
   void initState() {
     super.initState();
-    _fetchUserInfo();
+    if (widget.userCache.containsKey(widget.comment.userId)) {
+      _userInfo = widget.userCache[widget.comment.userId];
+      _isLoadingUser = false;
+    } else {
+      _fetchUserInfo();
+    }
+  }
+
+  @override
+  void dispose() {
+    _repliesSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _fetchUserInfo() async {
+    if (_userInfo != null) return; // Already loaded from cache in initState
+
+    final userId = widget.comment.userId;
+    
+    // Double check cache (in case it was added since initState, unlikely but safe)
+    if (widget.userCache.containsKey(userId)) {
+      if (mounted) {
+        setState(() {
+          _userInfo = widget.userCache[userId];
+          _isLoadingUser = false;
+        });
+      }
+      return;
+    }
+
     if (mounted) {
-      final info = await _inviteService.getUserBasicInfo(widget.comment.userId);
+      final info = await _inviteService.getUserBasicInfo(userId);
+      if (info != null) {
+        widget.userCache[userId] = info;
+      }
       if (mounted) {
         setState(() {
           _userInfo = info;
-          _isLoading = false;
+          _isLoadingUser = false;
         });
       }
     }
+  }
+
+  void _toggleReplies() {
+    setState(() {
+      _showReplies = !_showReplies;
+    });
+    
+    if (_showReplies && _replies.isEmpty) {
+      _fetchReplies();
+    }
+  }
+
+  void _fetchReplies() {
+    setState(() => _isLoadingReplies = true);
+    _repliesSubscription?.cancel();
+    _repliesSubscription = _communityService.getRepliesStream(widget.postId, widget.comment.id).listen((replies) {
+      if (mounted) {
+        setState(() {
+          _replies = replies;
+          _isLoadingReplies = false;
+        });
+      }
+    });
   }
 
   String _getTimeAgo(DateTime timestamp) {
@@ -516,73 +749,167 @@ class _CommentCardState extends State<_CommentCard> {
   Widget build(BuildContext context) {
     final userName = _userInfo?['fullName'] ?? 'User';
     final initials = userName.isNotEmpty ? userName.substring(0, min(2, userName.length)).toUpperCase() : 'U';
+    final isReplyingTo = widget.comment.id == widget.replyingToId;
 
-    return Container(
-      padding: const EdgeInsets.all(12), // Compact padding for comments
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.lightBorder, width: 1),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CircleAvatar(
-            radius: 16, // Smaller avatar for comments
-            backgroundColor: AppColors.lightTextTertiary.withOpacity(0.1),
-            child: _isLoading
-                ? const SizedBox(
-                    width: 12,
-                    height: 12,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Text(
-                    initials,
-                    style: widget.theme.textTheme.labelLarge?.copyWith(
-                      color: AppColors.lightTextTertiary,
-                      fontWeight: FontWeight.w700,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isReplyingTo ? AppColors.lightPrimary.withOpacity(0.05) : AppColors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isReplyingTo ? AppColors.lightPrimary : AppColors.lightBorder,
+              width: isReplyingTo ? 1.5 : 1,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CircleAvatar(
+                    radius: 16,
+                    backgroundColor: AppColors.lightTextTertiary.withOpacity(0.1),
+                    child: _isLoadingUser
+                        ? const SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(
+                            initials,
+                            style: widget.theme.textTheme.labelLarge?.copyWith(
+                              color: AppColors.lightTextTertiary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              _isLoadingUser ? 'Loading...' : userName,
+                              style: widget.theme.textTheme.bodyMedium?.copyWith(
+                                color: AppColors.lightTextPrimary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _getTimeAgo(widget.comment.timestamp),
+                              style: widget.theme.textTheme.bodySmall?.copyWith(
+                                color: AppColors.lightTextSecondary,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          widget.comment.text,
+                          style: widget.theme.textTheme.bodyMedium?.copyWith(
+                            color: AppColors.lightTextSecondary,
+                            fontSize: 13,
+                            height: 1.3,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        GestureDetector(
+                          onTap: () => widget.onReply(widget.comment),
+                          child: Text(
+                            'Reply',
+                            style: widget.theme.textTheme.labelSmall?.copyWith(
+                              color: AppColors.lightPrimary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
+                ],
+              ),
+            ],
           ),
-          const SizedBox(width: 10),
-          Expanded(
+        ),
+        
+        // Replies Section
+        if (widget.comment.replyCount > 0)
+          Padding(
+            padding: const EdgeInsets.only(left: 42.0, top: 8.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Text(
-                      _isLoading ? 'Loading...' : userName,
-                      style: widget.theme.textTheme.bodyMedium?.copyWith(
-                        color: AppColors.lightTextPrimary,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
+                if (!_showReplies)
+                  GestureDetector(
+                    onTap: _toggleReplies,
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 24,
+                          height: 1,
+                          color: AppColors.lightBorder,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'View ${widget.comment.replyCount} replies',
+                          style: widget.theme.textTheme.labelSmall?.copyWith(
+                            color: AppColors.lightTextSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else ...[
+                  if (_isLoadingReplies)
+                    const Padding(
+                      padding: EdgeInsets.all(8.0),
+                      child: SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  else
+                    ..._replies.map((reply) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8.0),
+                      child: _CommentCard(
+                        comment: reply,
+                        theme: widget.theme,
+                        postId: widget.postId,
+                        userCache: widget.userCache,
+                        replyingToId: widget.replyingToId,
+                        onReply: widget.onReply,
+                      ),
+                    )),
+                    
+                  GestureDetector(
+                    onTap: _toggleReplies,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 4.0),
+                      child: Text(
+                        'Hide replies',
+                        style: widget.theme.textTheme.labelSmall?.copyWith(
+                          color: AppColors.lightTextSecondary,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      _getTimeAgo(widget.comment.timestamp),
-                      style: widget.theme.textTheme.bodySmall?.copyWith(
-                        color: AppColors.lightTextSecondary,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  widget.comment.text,
-                  style: widget.theme.textTheme.bodyMedium?.copyWith(
-                    color: AppColors.lightTextSecondary,
-                    fontSize: 13,
-                    height: 1.3,
                   ),
-                ),
+                ],
               ],
             ),
           ),
-        ],
-      ),
+      ],
     );
   }
 }

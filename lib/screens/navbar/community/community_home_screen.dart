@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'package:flutter/material.dart';
 import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
 import 'package:provider/provider.dart';
@@ -25,16 +27,17 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
   final ScrollController _scrollController = ScrollController();
   
   // State
-  List<CommunityPost> _posts = [];
+  List<CommunityPost> _posts = []; // Flattened list for UI
+  final List<List<CommunityPost>> _pages = []; // Pages of posts
   List<String> _likedPostIds = [];
   bool _isLoading = true;
   String? _error;
-  int _limit = 20;
+  final int _pageSize = 20;
   bool _isLoadingMore = false;
+  bool _hasMore = true;
   
   // Subscriptions
-  StreamSubscription<List<CommunityPost>>? _postsSubscription;
-  StreamSubscription<List<String>>? _likesSubscription;
+  final List<StreamSubscription> _postSubscriptions = [];
 
   @override
   void initState() {
@@ -45,8 +48,7 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
 
   @override
   void dispose() {
-    _postsSubscription?.cancel();
-    _likesSubscription?.cancel();
+    for (var sub in _postSubscriptions) sub.cancel();
     _scrollController.dispose();
     super.dispose();
   }
@@ -58,33 +60,83 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
     if (user == null) return;
 
     // Subscribe to posts
-    _subscribeToPosts();
+    _reloadPosts();
 
-    // Subscribe to likes
-    _likesSubscription = _communityService.getLikedPostIdsStream(user.uid).listen(
-      (likedIds) {
-        if (mounted) {
-          setState(() {
-            _likedPostIds = likedIds;
-          });
-        }
-      },
-      onError: (e) {
-        debugPrint('Error fetching likes: $e');
-      },
-    );
+    // Fetch likes
+    _fetchLikes(user.uid);
   }
 
-  void _subscribeToPosts() {
-    _postsSubscription?.cancel();
-    _postsSubscription = _communityService.getPostsStream(limit: _limit).listen(
+  Future<void> _fetchLikes(String userId) async {
+    try {
+      final likedIds = await _communityService.getLikedPostIds(userId);
+      if (mounted) {
+        setState(() {
+          _likedPostIds = likedIds;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching likes: $e');
+    }
+  }
+
+  void _handleLikeToggle(String postId) {
+    setState(() {
+      if (_likedPostIds.contains(postId)) {
+        _likedPostIds.remove(postId);
+      } else {
+        _likedPostIds.add(postId);
+      }
+    });
+  }
+
+  void _reloadPosts() {
+    for (var sub in _postSubscriptions) sub.cancel();
+    _postSubscriptions.clear();
+    
+    if (mounted) {
+      setState(() {
+        _pages.clear();
+        _posts = [];
+        _isLoading = true;
+        _error = null;
+        _hasMore = true;
+      });
+    }
+    
+    _subscribeToPage(0);
+  }
+
+  void _subscribeToPage(int pageIndex, {DocumentSnapshot? startAfter}) {
+    // Add placeholder for page if needed
+    if (_pages.length <= pageIndex) {
+      _pages.add([]);
+    }
+
+    final stream = _communityService.getPostsStream(startAfter: startAfter, limit: _pageSize);
+    
+    final subscription = stream.listen(
       (posts) {
         if (mounted) {
           setState(() {
-            _posts = posts;
+            if (_pages.length > pageIndex) {
+              _pages[pageIndex] = posts;
+            } else {
+              _pages.add(posts);
+            }
+            
+            // Flatten pages to posts
+            _posts = _pages.expand((x) => x).toList();
+            
             _isLoading = false;
             _isLoadingMore = false;
             _error = null;
+            
+            // Check if this is the last page and if we have more data
+            if (pageIndex == _pages.length - 1) {
+              if (posts.length < _pageSize) {
+                _hasMore = false;
+              }
+            }
           });
         }
       },
@@ -98,22 +150,35 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
         }
       },
     );
+    
+    _postSubscriptions.add(subscription);
   }
 
   void _onScroll() {
     if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
-      if (!_isLoading && !_isLoadingMore) {
+      if (!_isLoading && !_isLoadingMore && _hasMore) {
         _loadMore();
       }
     }
   }
 
   void _loadMore() {
+    // Find last doc from the last non-empty page
+    DocumentSnapshot? lastDoc;
+    for (var i = _pages.length - 1; i >= 0; i--) {
+      if (_pages[i].isNotEmpty) {
+        lastDoc = _pages[i].last.snapshot;
+        break;
+      }
+    }
+    
+    if (lastDoc == null) return;
+
     setState(() {
       _isLoadingMore = true;
-      _limit += 20;
     });
-    _subscribeToPosts();
+    
+    _subscribeToPage(_pages.length, startAfter: lastDoc);
   }
 
   @override
@@ -201,6 +266,7 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
                         child: _CommunityPostCard(
                           post: postWithLikeStatus,
                           theme: theme,
+                          onLikeToggled: () => _handleLikeToggle(post.id),
                         ),
                       );
                     },
@@ -218,10 +284,12 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
 class _CommunityPostCard extends StatefulWidget {
   final CommunityPost post;
   final ThemeData theme;
+  final VoidCallback onLikeToggled;
 
   const _CommunityPostCard({
     required this.post,
     required this.theme,
+    required this.onLikeToggled,
   });
 
   @override
@@ -275,10 +343,21 @@ class _CommunityPostCardState extends State<_CommunityPostCard> {
     final user = authProvider.user;
     if (user == null) return;
 
+    // Optimistic update
+    widget.onLikeToggled();
+
     _communityService.toggleLike(
       widget.post.id,
       user.uid,
-    );
+    ).catchError((e) {
+      // Revert on error
+      if (mounted) {
+        widget.onLikeToggled();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to update like')),
+        );
+      }
+    });
   }
 
   @override

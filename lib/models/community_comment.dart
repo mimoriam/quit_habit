@@ -5,12 +5,18 @@ class CommunityComment {
   final String userId;
   final String text;
   final DateTime timestamp;
+  final String? parentId;
+  final String? replyToUserId;
+  final int replyCount;
 
   CommunityComment({
     required this.id,
     required this.userId,
     required this.text,
     required this.timestamp,
+    this.parentId,
+    this.replyToUserId,
+    this.replyCount = 0,
   });
 
   factory CommunityComment.fromFirestore(DocumentSnapshot doc) {
@@ -23,6 +29,9 @@ class CommunityComment {
       userId: data['userId'] ?? '',
       text: data['text'] ?? '',
       timestamp: (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      parentId: data['parentId'],
+      replyToUserId: data['replyToUserId'],
+      replyCount: data['replyCount'] ?? 0,
     );
   }
 
@@ -31,6 +40,9 @@ class CommunityComment {
       'userId': userId,
       'text': text,
       'timestamp': Timestamp.fromDate(timestamp),
+      'parentId': parentId,
+      'replyToUserId': replyToUserId,
+      'replyCount': replyCount,
     };
   }
 }

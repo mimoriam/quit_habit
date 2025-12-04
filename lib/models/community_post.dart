@@ -9,6 +9,7 @@ class CommunityPost {
   final int likesCount;
   final int commentsCount;
   final bool isLikedByMe; // Local state, not in Firestore
+  final DocumentSnapshot? snapshot; // Transient for pagination
 
   CommunityPost({
     required this.id,
@@ -19,6 +20,7 @@ class CommunityPost {
     this.likesCount = 0,
     this.commentsCount = 0,
     this.isLikedByMe = false,
+    this.snapshot,
   });
 
   factory CommunityPost.fromFirestore(DocumentSnapshot doc, {bool isLiked = false}) {
@@ -35,6 +37,7 @@ class CommunityPost {
       likesCount: data['likesCount'] ?? 0,
       commentsCount: data['commentsCount'] ?? 0,
       isLikedByMe: isLiked,
+      snapshot: doc,
     );
   }
 
@@ -58,6 +61,7 @@ class CommunityPost {
     int? likesCount,
     int? commentsCount,
     bool? isLikedByMe,
+    DocumentSnapshot? snapshot,
   }) {
     return CommunityPost(
       id: id ?? this.id,
@@ -68,6 +72,7 @@ class CommunityPost {
       likesCount: likesCount ?? this.likesCount,
       commentsCount: commentsCount ?? this.commentsCount,
       isLikedByMe: isLikedByMe ?? this.isLikedByMe,
+      snapshot: snapshot ?? this.snapshot,
     );
   }
 }
