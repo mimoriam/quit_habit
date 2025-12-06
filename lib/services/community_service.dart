@@ -232,4 +232,72 @@ class CommunityService {
       }).toList();
     });
   }
+
+  /// Delete a post
+  Future<void> deletePost(String postId) async {
+    await _postsRef.doc(postId).delete();
+  }
+
+  /// Delete a comment
+  Future<void> deleteComment({
+    required String postId,
+    required String commentId,
+    required bool isReply,
+    String? parentId,
+  }) async {
+    final postRef = _postsRef.doc(postId);
+    final commentRef = postRef.collection('comments').doc(commentId);
+
+    // If top-level comment, fetch replies first to ensure we know what to delete
+    // This is done outside the transaction to avoid restrictions on query/get inside transaction
+    List<DocumentReference> replyRefs = [];
+    if (!isReply) {
+      final repliesSnapshot = await postRef
+          .collection('comments')
+          .where('parentId', isEqualTo: commentId)
+          .get();
+      replyRefs = repliesSnapshot.docs.map((d) => d.reference).toList();
+    }
+
+    await _firestore.runTransaction((transaction) async {
+      // Get post doc to verify and update count
+      final postDoc = await transaction.get(postRef);
+      if (!postDoc.exists) throw Exception('Post not found');
+
+      if (isReply) {
+        // Just delete the reply and decrement counts
+        if (parentId == null) throw ArgumentError('ParentId required for replies');
+        
+        final parentRef = postRef.collection('comments').doc(parentId);
+        final parentDoc = await transaction.get(parentRef);
+        if (!parentDoc.exists) throw Exception('Parent comment not found');
+        
+        final commentDoc = await transaction.get(commentRef);
+        if (!commentDoc.exists) throw Exception('Comment not found');
+        
+        transaction.delete(commentRef);
+        transaction.update(parentRef, {
+          'replyCount': FieldValue.increment(-1),
+        });
+        transaction.update(postRef, {
+          'commentsCount': FieldValue.increment(-1),
+        });
+      } else {
+        // Top-level comment: Delete all replies + comment
+        
+        // Delete all replies
+        for (var ref in replyRefs) {
+          transaction.delete(ref);
+        }
+        
+        // Delete the comment itself
+        transaction.delete(commentRef);
+        
+        // Update post comment count (1 for comment + N for replies)
+        transaction.update(postRef, {
+          'commentsCount': FieldValue.increment(-(1 + replyRefs.length)),
+        });
+      }
+    });
+  }
 }

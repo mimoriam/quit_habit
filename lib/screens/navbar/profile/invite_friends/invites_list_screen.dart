@@ -713,12 +713,7 @@ class _FriendCard extends StatelessWidget {
                   ],
                 ),
               ),
-              IconButton(
-                icon: const Icon(Icons.more_vert, color: AppColors.lightTextTertiary),
-                onPressed: () {
-                  // TODO: Implement friend options (remove, block, etc.)
-                },
-              ),
+
             ],
           ),
         );

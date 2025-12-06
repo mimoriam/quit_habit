@@ -375,17 +375,23 @@ class _PostCommentScreenState extends State<PostCommentScreen> {
                             : const SizedBox(height: 24); // Bottom padding
                       }
                       
+                      final comment = _comments[index];
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 12),
                         child: _CommentCard(
-                          comment: _comments[index],
+                          comment: comment,
                           theme: theme,
                           postId: widget.post.id,
                           userCache: _userCache,
                           replyingToId: _replyingTo?.id,
-                          onReply: (comment) {
+                          onDelete: () {
+                             setState(() {
+                               _comments.removeWhere((c) => c.id == comment.id);
+                             });
+                          },
+                          onReply: (c) {
                             setState(() {
-                              _replyingTo = comment;
+                              _replyingTo = c;
                             });
                             _commentFocusNode.requestFocus();
                           },
@@ -429,6 +435,7 @@ class _PostCommentScreenState extends State<PostCommentScreen> {
     final initials = userName.isNotEmpty ? userName.substring(0, min(2, userName.length)).toUpperCase() : 'U';
     final avatarColor = AppColors.lightPrimary.withOpacity(0.1);
     final avatarTextColor = AppColors.lightPrimary;
+    final authProvider = context.read<AuthProvider>();
 
     return Container(
       padding: const EdgeInsets.all(16), // Compact padding
@@ -473,6 +480,59 @@ class _PostCommentScreenState extends State<PostCommentScreen> {
                 ],
               ),
               const Spacer(),
+              // Delete Post Option (if owner)
+              if (authProvider.user?.uid == widget.post.userId)
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert, color: AppColors.lightTextSecondary, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onSelected: (value) async {
+                     if (value == 'delete') {
+                       final confirm = await showDialog<bool>(
+                         context: context,
+                         builder: (context) => AlertDialog(
+                           title: const Text('Delete Post?'),
+                           content: const Text('This action cannot be undone.'),
+                           actions: [
+                             TextButton(
+                               onPressed: () => Navigator.pop(context, false),
+                               child: const Text('Cancel', style: TextStyle(color: AppColors.lightTextSecondary)),
+                             ),
+                             TextButton(
+                               onPressed: () => Navigator.pop(context, true),
+                               child: const Text('Delete', style: TextStyle(color: AppColors.lightError)),
+                             ),
+                           ],
+                         ),
+                       );
+                       
+                       if (confirm == true && mounted) {
+                         try {
+                           await _communityService.deletePost(widget.post.id);
+                           if (mounted) Navigator.pop(context); // Close screen
+                         } catch (e) {
+                           if (mounted) {
+                             ScaffoldMessenger.of(context).showSnackBar(
+                               SnackBar(content: Text('Error deleting post: $e')),
+                             );
+                           }
+                         }
+                       }
+                     }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete_outline, color: AppColors.lightError, size: 20),
+                          SizedBox(width: 8),
+                          Text('Delete', style: TextStyle(color: AppColors.lightError)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               if (widget.post.streakDays > 0)
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -749,6 +809,7 @@ class _CommentCard extends StatefulWidget {
   final String postId;
   final Map<String, Map<String, dynamic>> userCache;
   final Function(CommunityComment) onReply;
+  final VoidCallback? onDelete;
   final String? replyingToId;
 
   const _CommentCard({
@@ -757,6 +818,7 @@ class _CommentCard extends StatefulWidget {
     required this.postId,
     required this.userCache,
     required this.onReply,
+    this.onDelete,
     this.replyingToId,
   });
 
@@ -887,6 +949,8 @@ class _CommentCardState extends State<_CommentCard> {
 
   @override
   Widget build(BuildContext context) {
+    final user = context.read<AuthProvider>().user;
+    final isOwner = user?.uid == widget.comment.userId;
     final userName = _userInfo?['fullName'] ?? 'User';
     final initials = userName.isNotEmpty ? userName.substring(0, min(2, userName.length)).toUpperCase() : 'U';
     final isReplyingTo = widget.comment.id == widget.replyingToId;
@@ -894,94 +958,166 @@ class _CommentCardState extends State<_CommentCard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: isReplyingTo ? AppColors.lightPrimary.withOpacity(0.05) : AppColors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isReplyingTo ? AppColors.lightPrimary : AppColors.lightBorder,
-              width: isReplyingTo ? 1.5 : 1,
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+        Stack(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isReplyingTo ? AppColors.lightPrimary.withOpacity(0.05) : AppColors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isReplyingTo ? AppColors.lightPrimary : AppColors.lightBorder,
+                  width: isReplyingTo ? 1.5 : 1,
+                ),
+              ),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  CircleAvatar(
-                    radius: 16,
-                    backgroundColor: AppColors.lightTextTertiary.withOpacity(0.1),
-                    child: _isLoadingUser
-                        ? const SizedBox(
-                            width: 12,
-                            height: 12,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Text(
-                            initials,
-                            style: widget.theme.textTheme.labelLarge?.copyWith(
-                              color: AppColors.lightTextTertiary,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      CircleAvatar(
+                        radius: 16,
+                        backgroundColor: AppColors.lightTextTertiary.withOpacity(0.1),
+                        child: _isLoadingUser
+                            ? const SizedBox(
+                                width: 12,
+                                height: 12,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : Text(
+                                initials,
+                                style: widget.theme.textTheme.labelLarge?.copyWith(
+                                  color: AppColors.lightTextTertiary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            Row(
+                              children: [
+                                Text(
+                                  _isLoadingUser ? 'Loading...' : userName,
+                                  style: widget.theme.textTheme.bodyMedium?.copyWith(
+                                    color: AppColors.lightTextPrimary,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _getTimeAgo(widget.comment.timestamp),
+                                  style: widget.theme.textTheme.bodySmall?.copyWith(
+                                    color: AppColors.lightTextSecondary,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
                             Text(
-                              _isLoadingUser ? 'Loading...' : userName,
+                              widget.comment.text,
                               style: widget.theme.textTheme.bodyMedium?.copyWith(
-                                color: AppColors.lightTextPrimary,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              _getTimeAgo(widget.comment.timestamp),
-                              style: widget.theme.textTheme.bodySmall?.copyWith(
                                 color: AppColors.lightTextSecondary,
-                                fontSize: 11,
+                                fontSize: 13,
+                                height: 1.3,
                               ),
                             ),
+                            // Only show Reply button for top-level comments (not inner replies)
+                            if (widget.comment.parentId == null) ...[
+                              const SizedBox(height: 8),
+                              GestureDetector(
+                                onTap: () => widget.onReply(widget.comment),
+                                child: Text(
+                                  'Reply',
+                                  style: widget.theme.textTheme.labelSmall?.copyWith(
+                                    color: AppColors.lightPrimary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          widget.comment.text,
-                          style: widget.theme.textTheme.bodyMedium?.copyWith(
-                            color: AppColors.lightTextSecondary,
-                            fontSize: 13,
-                            height: 1.3,
-                          ),
-                        ),
-                        // Only show Reply button for top-level comments (not inner replies)
-                        if (widget.comment.parentId == null) ...[
-                          const SizedBox(height: 8),
-                          GestureDetector(
-                            onTap: () => widget.onReply(widget.comment),
-                            child: Text(
-                              'Reply',
-                              style: widget.theme.textTheme.labelSmall?.copyWith(
-                                color: AppColors.lightPrimary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
-          ),
+            ),
+            if (isOwner)
+              Positioned(
+                right: 0,
+                top: 0,
+                child: PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert, size: 16, color: AppColors.lightTextTertiary),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onSelected: (value) async {
+                    if (value == 'delete') {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Delete Comment?'),
+                          content: Text(widget.comment.parentId == null 
+                            ? 'This will also delete all replies.' 
+                            : 'Are you sure you want to delete this comment?'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('Cancel', style: TextStyle(color: AppColors.lightTextSecondary)),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              child: const Text('Delete', style: TextStyle(color: AppColors.lightError)),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      if (confirm == true && mounted) {
+                        try {
+                          // Always perform Firestore delete first
+                          await _communityService.deleteComment(
+                            postId: widget.postId,
+                            commentId: widget.comment.id,
+                            isReply: widget.comment.parentId != null,
+                            parentId: widget.comment.parentId,
+                          );
+                          // Then update local state if callback provided
+                          if (widget.onDelete != null) {
+                            widget.onDelete!();
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Error deleting comment: $e')),
+                            );
+                          }
+                        }
+                      }
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'delete',
+                      height: 32,
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete_outline, color: AppColors.lightError, size: 16),
+                          SizedBox(width: 8),
+                          Text('Delete', style: TextStyle(color: AppColors.lightError, fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
         ),
         
         // Replies Section
