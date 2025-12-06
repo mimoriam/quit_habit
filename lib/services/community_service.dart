@@ -166,13 +166,14 @@ class CommunityService {
     required String postId,
     List<Object?>? startAfter,
     int limit = 20,
+    bool descending = true,
   }) async {
     Query query = _postsRef
         .doc(postId)
         .collection('comments')
         .where('parentId', isNull: true)
-        .orderBy('timestamp', descending: false)
-        .orderBy(FieldPath.documentId)
+        .orderBy('timestamp', descending: descending)
+        .orderBy(FieldPath.documentId, descending: descending)
         .limit(limit);
 
     if (startAfter != null) {

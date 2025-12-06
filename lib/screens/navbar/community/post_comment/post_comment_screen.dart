@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:math';
+
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -46,6 +46,7 @@ class _PostCommentScreenState extends State<PostCommentScreen> {
   // Subscriptions
   StreamSubscription<List<CommunityComment>>? _newCommentsSubscription;
   late Stream<CommunityPost?> _postStream;
+  bool _isNewestFirst = true;
 
   @override
   void initState() {
@@ -77,29 +78,43 @@ class _PostCommentScreenState extends State<PostCommentScreen> {
   }
 
   Future<void> _fetchInitialComments() async {
-    final boundaryTimestamp = Timestamp.now();
+    setState(() {
+      _isLoading = true;
+      _error = null;
+      _comments.clear();
+      _hasMore = true;
+      _lastPagedComment = null;
+    });
+
     try {
       final comments = await _communityService.getComments(
         postId: widget.post.id,
         limit: 20,
+        descending: _isNewestFirst,
       );
       
       if (mounted) {
         setState(() {
           _comments = comments;
+          _isLoading = false;
           if (comments.isNotEmpty) {
             _lastPagedComment = comments.last;
           }
-          _isLoading = false;
-          _hasMore = comments.length >= 20;
+          if (comments.length < 20) {
+            _hasMore = false;
+          }
         });
         
-        // Use the boundary timestamp to ensure we don't miss comments added during the fetch
-        // If we fetched comments, we can also use the last comment's timestamp if it's newer than boundary
-        // but boundary is safer to avoid gaps if the fetch didn't get everything.
-        // Actually, if we use boundary (start of fetch), we cover everything after start.
-        // Duplicates are filtered in the listener.
-        _setupNewCommentsListener(boundaryTimestamp);
+        // Current max timestamp we have seen (or now if empty) to start listening for NEWER ones
+        // If sorting newest first, the top item is the newest.
+        // If sorting oldest first, it's the last element.
+        // Actually, for realtime updates, we always want things newer than what we have currently OR "now" if we have nothing.
+        // But to be safe, let's just listen from "now" onwards for *newly created* comments during this session.
+        // Or better: track the absolute latest timestamp we have seen.
+        
+        // We always want to listen for *future* comments from this point on.
+        // Existing comments are handled by pagination.
+        _setupNewCommentsListener(Timestamp.now());
       }
     } catch (e) {
       if (mounted) {
@@ -125,7 +140,13 @@ class _PostCommentScreenState extends State<PostCommentScreen> {
         
         if (uniqueNew.isNotEmpty) {
            setState(() {
-             _comments.addAll(uniqueNew);
+             if (_isNewestFirst) {
+               // Prepend to top
+               _comments.insertAll(0, uniqueNew);
+             } else {
+               // Append to bottom
+               _comments.addAll(uniqueNew);
+             }
            });
         }
       }
@@ -150,6 +171,7 @@ class _PostCommentScreenState extends State<PostCommentScreen> {
         postId: widget.post.id,
         startAfter: [_lastPagedComment!.timestamp, _lastPagedComment!.id],
         limit: 20,
+        descending: _isNewestFirst,
       );
       
       if (mounted) {
@@ -303,6 +325,15 @@ class _PostCommentScreenState extends State<PostCommentScreen> {
                                   color: AppColors.lightPrimary,
                                   fontWeight: FontWeight.w700,
                                 ),
+                              ),
+                            ),
+                            const Spacer(),
+                            IconButton(
+                              icon: const Icon(Icons.filter_list_rounded, color: AppColors.lightTextSecondary),
+                              onPressed: _showFilterBottomSheet,
+                              constraints: const BoxConstraints(),
+                              style: IconButton.styleFrom(
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               ),
                             ),
                           ],
@@ -601,6 +632,114 @@ class _PostCommentScreenState extends State<PostCommentScreen> {
   
   int min(int a, int b) {
     return a < b ? a : b;
+  }
+
+  void _showFilterBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        final theme = Theme.of(context);
+        return Container(
+          decoration: const BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.lightBorder,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Row(
+                  children: [
+                    Text(
+                      'Filter Comments',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.lightTextPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              _buildFilterOption(
+                context,
+                title: 'Newest First',
+                isSelected: _isNewestFirst,
+                onTap: () {
+                  Navigator.pop(context);
+                  if (!_isNewestFirst) {
+                    setState(() => _isNewestFirst = true);
+                    _fetchInitialComments();
+                  }
+                },
+              ),
+              _buildFilterOption(
+                context,
+                title: 'Oldest First',
+                isSelected: !_isNewestFirst,
+                onTap: () {
+                  Navigator.pop(context);
+                  if (_isNewestFirst) {
+                    setState(() => _isNewestFirst = false);
+                    _fetchInitialComments();
+                  }
+                },
+              ),
+              const SizedBox(height: 32),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFilterOption(
+    BuildContext context, {
+    required String title,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+        child: Row(
+          children: [
+            Text(
+              title,
+              style: theme.textTheme.bodyLarge?.copyWith(
+                color: isSelected ? AppColors.lightPrimary : AppColors.lightTextPrimary,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+              ),
+            ),
+            const Spacer(),
+            if (isSelected)
+              const Icon(
+                Icons.check_circle_rounded,
+                color: AppColors.lightPrimary,
+              )
+            else
+              const Icon(
+                Icons.circle_outlined,
+                color: AppColors.lightBorder,
+              ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
