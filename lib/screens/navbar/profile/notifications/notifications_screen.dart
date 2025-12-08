@@ -125,24 +125,24 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           });
                         },
                       ),
-                      const Divider(
-                        height: 1.5,
-                        color: AppColors.lightBorder,
-                        indent: 72,
-                      ),
-                      _buildSettingRow(
-                        theme: theme,
-                        icon: Icons.notifications_none_outlined,
-                        iconColor: AppColors.lightWarning,
-                        title: 'General Notifications',
-                        subtitle: 'App updates & tips',
-                        value: _generalNotifications,
-                        onChanged: (val) {
-                          setState(() {
-                            _generalNotifications = val;
-                          });
-                        },
-                      ),
+                      // const Divider(
+                      //   height: 1.5,
+                      //   color: AppColors.lightBorder,
+                      //   indent: 72,
+                      // ),
+                      // _buildSettingRow(
+                      //   theme: theme,
+                      //   icon: Icons.notifications_none_outlined,
+                      //   iconColor: AppColors.lightWarning,
+                      //   title: 'General Notifications',
+                      //   subtitle: 'App updates & tips',
+                      //   value: _generalNotifications,
+                      //   onChanged: (val) {
+                      //     setState(() {
+                      //       _generalNotifications = val;
+                      //     });
+                      //   },
+                      // ),
                     ],
                   ),
                 ),

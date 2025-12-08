@@ -1094,22 +1094,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const Color(0xFF84CC16), // Lime/Green
           onTap: () {},
         ),
-        const SizedBox(height: 8),
-        _buildSettingTile(
-          theme,
-          'Account',
-          'Manage your account settings',
-          Icons.person,
-          const Color(0xFF3B82F6), // Blue
-          onTap: () {
-            PersistentNavBarNavigator.pushNewScreen(
-              context,
-              screen: const MyDataScreen(),
-              withNavBar: false,
-              pageTransitionAnimation: PageTransitionAnimation.cupertino,
-            );
-          },
-        ),
+        // const SizedBox(height: 8),
+        // _buildSettingTile(
+        //   theme,
+        //   'Account',
+        //   'Manage your account settings',
+        //   Icons.person,
+        //   const Color(0xFF3B82F6), // Blue
+        //   onTap: () {
+        //     PersistentNavBarNavigator.pushNewScreen(
+        //       context,
+        //       screen: const MyDataScreen(),
+        //       withNavBar: false,
+        //       pageTransitionAnimation: PageTransitionAnimation.cupertino,
+        //     );
+        //   },
+        // ),
         const SizedBox(height: 8),
         _buildSettingTile(
           theme,
