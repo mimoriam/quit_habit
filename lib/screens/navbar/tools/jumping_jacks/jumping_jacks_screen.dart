@@ -9,34 +9,86 @@ class JumpingJacksScreen extends StatefulWidget {
   State<JumpingJacksScreen> createState() => _JumpingJacksScreenState();
 }
 
-class _JumpingJacksScreenState extends State<JumpingJacksScreen> {
+class _JumpingJacksScreenState extends State<JumpingJacksScreen>
+    with TickerProviderStateMixin {
   // State variables for the workout
-  int _totalRounds = 0;
-  int _countdown = 30; // Initial countdown value
-  final int _currentExercise = 1;
-  final int _totalExercises = 5;
+  int _currentRound = 0; // 0 means not started, 1-5 are active rounds
+  static const int _totalRounds = 5;
+  int _countdown = 30; // 30 seconds per round
+  static const int _roundDuration = 30;
   bool _isWorkoutStarted = false;
+  bool _isWorkoutComplete = false;
 
   Timer? _workoutTimer;
   Timer? _countdownTimer;
 
   int _totalSeconds = 0;
 
+  // Animation controller for progress bar
+  late AnimationController _progressController;
+  late Animation<double> _progressAnimation;
+  double _targetProgress = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _progressController = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+    _progressAnimation = Tween<double>(begin: 0.0, end: 0.0).animate(
+      CurvedAnimation(parent: _progressController, curve: Curves.easeInOut),
+    );
+  }
+
   @override
   void dispose() {
     _workoutTimer?.cancel();
     _countdownTimer?.cancel();
+    _progressController.dispose();
     super.dispose();
+  }
+
+  void _updateProgressAnimation(double newProgress) {
+    final oldProgress = _targetProgress;
+    _targetProgress = newProgress;
+    _progressAnimation = Tween<double>(begin: oldProgress, end: newProgress)
+        .animate(CurvedAnimation(
+      parent: _progressController,
+      curve: Curves.easeInOut,
+    ));
+    _progressController.reset();
+    _progressController.forward();
   }
 
   // --- Timer Logic ---
 
   void _toggleWorkout() {
+    if (_isWorkoutComplete) {
+      // Reset workout
+      setState(() {
+        _currentRound = 0;
+        _countdown = _roundDuration;
+        _totalSeconds = 0;
+        _isWorkoutComplete = false;
+        _isWorkoutStarted = false;
+      });
+      _updateProgressAnimation(0.0);
+      return;
+    }
+
     setState(() {
       _isWorkoutStarted = !_isWorkoutStarted;
     });
 
     if (_isWorkoutStarted) {
+      // If first start, set round to 1
+      if (_currentRound == 0) {
+        setState(() {
+          _currentRound = 1;
+        });
+        _updateProgressAnimation(0.0);
+      }
       // Start main duration timer
       _workoutTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
         setState(() {
@@ -58,15 +110,32 @@ class _JumpingJacksScreenState extends State<JumpingJacksScreen> {
         setState(() {
           _countdown--;
         });
+        // Update progress animation in real-time within the round
+        final roundProgress = (_roundDuration - _countdown) / _roundDuration;
+        final overallProgress =
+            ((_currentRound - 1) + roundProgress) / _totalRounds;
+        _updateProgressAnimation(overallProgress);
       } else {
-        // When countdown finishes, reset it (or move to next exercise)
+        // Round completed
         timer.cancel();
-        setState(() {
-          _countdown = 30; // Reset for next round/exercise
-          // TODO: Add logic to move to next exercise or round
-          // For this example, we just stop the workout
-          _toggleWorkout(); // Stop the workout for demo
-        });
+        if (_currentRound < _totalRounds) {
+          // Move to next round
+          setState(() {
+            _currentRound++;
+            _countdown = _roundDuration;
+          });
+          _updateProgressAnimation((_currentRound - 1) / _totalRounds);
+          // Continue with next round
+          _startCountdown();
+        } else {
+          // Workout complete!
+          _workoutTimer?.cancel();
+          setState(() {
+            _isWorkoutStarted = false;
+            _isWorkoutComplete = true;
+          });
+          _updateProgressAnimation(1.0);
+        }
       }
     });
   }
@@ -131,26 +200,66 @@ class _JumpingJacksScreenState extends State<JumpingJacksScreen> {
           ),
           const SizedBox(width: 16),
         ],
-        // Progress Bar
+        // Animated Progress Bar
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(12.0),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(24.0, 0, 24.0, 8.0),
-            child: Row(
-              children: List.generate(_totalExercises, (index) {
-                return Expanded(
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 2.0),
-                    height: 4.0,
-                    decoration: BoxDecoration(
-                      color: index < _currentExercise
-                          ? AppColors.lightPrimary
-                          : AppColors.lightBorder,
-                      borderRadius: BorderRadius.circular(2.0),
-                    ),
-                  ),
+            child: AnimatedBuilder(
+              animation: _progressController,
+              builder: (context, child) {
+                return Row(
+                  children: List.generate(_totalRounds, (index) {
+                    // Calculate fill percentage for this segment
+                    final segmentStart = index / _totalRounds;
+                    final segmentEnd = (index + 1) / _totalRounds;
+                    final currentProgress = _progressAnimation.value;
+                    
+                    double fillPercent = 0.0;
+                    if (currentProgress >= segmentEnd) {
+                      fillPercent = 1.0; // Fully filled
+                    } else if (currentProgress > segmentStart) {
+                      // Partially filled
+                      fillPercent = (currentProgress - segmentStart) / (segmentEnd - segmentStart);
+                    }
+                    
+                    return Expanded(
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 2.0),
+                        height: 4.0,
+                        decoration: BoxDecoration(
+                          color: AppColors.lightBorder,
+                          borderRadius: BorderRadius.circular(2.0),
+                        ),
+                        child: FractionallySizedBox(
+                          alignment: Alignment.centerLeft,
+                          widthFactor: fillPercent,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  AppColors.lightPrimary,
+                                  AppColors.lightPrimary.withAlpha(200),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(2.0),
+                              boxShadow: fillPercent > 0
+                                  ? [
+                                      BoxShadow(
+                                        color: AppColors.lightPrimary.withAlpha(100),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 1),
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
                 );
-              }),
+              },
             ),
           ),
         ),
@@ -167,8 +276,8 @@ class _JumpingJacksScreenState extends State<JumpingJacksScreen> {
                   Expanded(
                     child: _buildStatCard(
                       theme,
-                      value: _totalRounds.toString(),
-                      label: 'Rounds',
+                      value: _currentRound > 0 ? '$_currentRound/$_totalRounds' : '0/$_totalRounds',
+                      label: 'Round',
                       bgColor: AppColors.white,
                       textColor: AppColors.lightTextPrimary,
                     ),
@@ -186,13 +295,40 @@ class _JumpingJacksScreenState extends State<JumpingJacksScreen> {
                 ],
               ),
               const SizedBox(height: 24), // Compacted
-              // 2. Main Exercise Info
-              Text(
-                'Exercise $_currentExercise of $_totalExercises',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: AppColors.lightTextSecondary,
-                  fontWeight: FontWeight.w500,
-                ),
+              // 2. Main Exercise Info - Round indicator
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                transitionBuilder: (child, animation) {
+                  return FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0, 0.3),
+                        end: Offset.zero,
+                      ).animate(animation),
+                      child: child,
+                    ),
+                  );
+                },
+                child: _isWorkoutComplete
+                    ? Text(
+                        '🎉 Workout Complete!',
+                        key: const ValueKey('complete'),
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: AppColors.lightSuccess,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      )
+                    : Text(
+                        _currentRound > 0
+                            ? 'Round $_currentRound of $_totalRounds'
+                            : 'Ready to start',
+                        key: ValueKey('round_$_currentRound'),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: AppColors.lightTextSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
               ),
               const SizedBox(height: 16), // Compacted
               // Placeholder Icon (from screenshot)
@@ -222,29 +358,56 @@ class _JumpingJacksScreenState extends State<JumpingJacksScreen> {
               ),
               const SizedBox(height: 24), // Compacted
               // 3. Timer Circle
-              Container(
-                width: 180, // Compacted
-                height: 180, // Compacted
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                width: 180,
+                height: 180,
                 decoration: BoxDecoration(
-                  color: AppColors.white,
+                  color: _isWorkoutComplete
+                      ? AppColors.lightSuccess.withAlpha(25)
+                      : AppColors.white,
                   shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.lightBorder, width: 1.5),
-                  boxShadow: const [
+                  border: Border.all(
+                    color: _isWorkoutComplete
+                        ? AppColors.lightSuccess
+                        : AppColors.lightBorder,
+                    width: 1.5,
+                  ),
+                  boxShadow: [
                     BoxShadow(
-                      color: AppColors.lightShadow,
+                      color: _isWorkoutComplete
+                          ? AppColors.lightSuccess.withAlpha(50)
+                          : AppColors.lightShadow,
                       blurRadius: 20,
-                      offset: Offset(0, 4),
+                      offset: const Offset(0, 4),
                     ),
                   ],
                 ),
                 child: Center(
-                  child: Text(
-                    _countdown.toString(),
-                    style: theme.textTheme.displayLarge?.copyWith(
-                      fontSize: 72, // Compacted
-                      fontWeight: FontWeight.w300,
-                      color: AppColors.lightTextTertiary,
-                    ),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    transitionBuilder: (child, animation) {
+                      return ScaleTransition(
+                        scale: animation,
+                        child: FadeTransition(opacity: animation, child: child),
+                      );
+                    },
+                    child: _isWorkoutComplete
+                        ? const Icon(
+                            key: ValueKey('checkmark'),
+                            Icons.check_rounded,
+                            size: 72,
+                            color: AppColors.lightSuccess,
+                          )
+                        : Text(
+                            key: ValueKey('countdown_$_countdown'),
+                            _countdown.toString(),
+                            style: theme.textTheme.displayLarge?.copyWith(
+                              fontSize: 72,
+                              fontWeight: FontWeight.w300,
+                              color: AppColors.lightTextTertiary,
+                            ),
+                          ),
                   ),
                 ),
               ),
@@ -255,15 +418,27 @@ class _JumpingJacksScreenState extends State<JumpingJacksScreen> {
                 height: 52,
                 child: ElevatedButton.icon(
                   onPressed: _toggleWorkout,
-                  style: theme.elevatedButtonTheme.style,
+                  style: _isWorkoutComplete
+                      ? theme.elevatedButtonTheme.style?.copyWith(
+                          backgroundColor: WidgetStateProperty.all(
+                            AppColors.lightSuccess,
+                          ),
+                        )
+                      : theme.elevatedButtonTheme.style,
                   icon: Icon(
-                    _isWorkoutStarted
-                        ? Icons.pause_rounded
-                        : Icons.play_arrow_rounded,
+                    _isWorkoutComplete
+                        ? Icons.refresh_rounded
+                        : _isWorkoutStarted
+                            ? Icons.pause_rounded
+                            : Icons.play_arrow_rounded,
                     size: 24,
                   ),
                   label: Text(
-                    _isWorkoutStarted ? 'Pause Workout' : 'Start Workout',
+                    _isWorkoutComplete
+                        ? 'Start Again'
+                        : _isWorkoutStarted
+                            ? 'Pause Workout'
+                            : 'Start Workout',
                     style: theme.textTheme.labelLarge?.copyWith(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
