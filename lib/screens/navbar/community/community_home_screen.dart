@@ -14,6 +14,7 @@ import 'package:quit_habit/screens/navbar/community/post_comment/post_comment_sc
 import 'package:quit_habit/services/community_service.dart';
 import 'package:quit_habit/services/invite_service.dart';
 import 'package:quit_habit/utils/app_colors.dart';
+import 'package:quit_habit/widgets/user_profile_popup.dart';
 
 class CommunityHomeScreen extends StatefulWidget {
   const CommunityHomeScreen({super.key});
@@ -407,22 +408,33 @@ class _CommunityPostCardState extends State<_CommunityPostCard> {
           children: [
             Row(
               children: [
-                CircleAvatar(
-                  radius: 18,
-                  backgroundColor: avatarColor,
-                  child: _isLoadingUser
-                      ? const SizedBox(
-                          width: 12,
-                          height: 12,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(
-                          initials,
-                          style: widget.theme.textTheme.labelLarge?.copyWith(
-                            color: avatarTextColor,
-                            fontWeight: FontWeight.w700,
+                GestureDetector(
+                  onTap: () {
+                    if (!_isLoadingUser) {
+                      showUserProfilePopup(
+                        context,
+                        userId: widget.post.userId,
+                        userName: userName,
+                      );
+                    }
+                  },
+                  child: CircleAvatar(
+                    radius: 18,
+                    backgroundColor: avatarColor,
+                    child: _isLoadingUser
+                        ? const SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(
+                            initials,
+                            style: widget.theme.textTheme.labelLarge?.copyWith(
+                              color: avatarTextColor,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
-                        ),
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -432,13 +444,24 @@ class _CommunityPostCardState extends State<_CommunityPostCard> {
                       Row(
                         children: [
                           Flexible(
-                            child: Text(
-                              _isLoadingUser ? 'Loading...' : userName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: widget.theme.textTheme.bodyMedium?.copyWith(
-                                color: AppColors.lightTextPrimary,
-                                fontWeight: FontWeight.w600,
+                            child: GestureDetector(
+                              onTap: () {
+                                if (!_isLoadingUser) {
+                                  showUserProfilePopup(
+                                    context,
+                                    userId: widget.post.userId,
+                                    userName: userName,
+                                  );
+                                }
+                              },
+                              child: Text(
+                                _isLoadingUser ? 'Loading...' : userName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: widget.theme.textTheme.bodyMedium?.copyWith(
+                                  color: AppColors.lightTextPrimary,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ),

@@ -11,6 +11,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:quit_habit/services/community_service.dart';
 import 'package:quit_habit/services/invite_service.dart';
 import 'package:quit_habit/utils/app_colors.dart';
+import 'package:quit_habit/widgets/user_profile_popup.dart';
 
 class PostCommentScreen extends StatefulWidget {
   final CommunityPost post;
@@ -449,35 +450,53 @@ class _PostCommentScreenState extends State<PostCommentScreen> {
         children: [
           Row(
             children: [
-              CircleAvatar(
-                radius: 20, // Compact avatar
-                backgroundColor: avatarColor,
-                child: Text(
-                  initials,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: avatarTextColor,
-                    fontWeight: FontWeight.w700,
+              GestureDetector(
+                onTap: () {
+                  showUserProfilePopup(
+                    context,
+                    userId: widget.post.userId,
+                    userName: userName,
+                  );
+                },
+                child: CircleAvatar(
+                  radius: 20, // Compact avatar
+                  backgroundColor: avatarColor,
+                  child: Text(
+                    initials,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: avatarTextColor,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),
               const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    userName,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: AppColors.lightTextPrimary,
-                      fontWeight: FontWeight.w600,
+              GestureDetector(
+                onTap: () {
+                  showUserProfilePopup(
+                    context,
+                    userId: widget.post.userId,
+                    userName: userName,
+                  );
+                },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      userName,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: AppColors.lightTextPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                  Text(
-                    _getTimeAgo(widget.post.timestamp),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppColors.lightTextSecondary,
+                    Text(
+                      _getTimeAgo(widget.post.timestamp),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.lightTextSecondary,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               const Spacer(),
               // Delete Post Option (if owner)
@@ -976,22 +995,33 @@ class _CommentCardState extends State<_CommentCard> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      CircleAvatar(
-                        radius: 16,
-                        backgroundColor: AppColors.lightTextTertiary.withOpacity(0.1),
-                        child: _isLoadingUser
-                            ? const SizedBox(
-                                width: 12,
-                                height: 12,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : Text(
-                                initials,
-                                style: widget.theme.textTheme.labelLarge?.copyWith(
-                                  color: AppColors.lightTextTertiary,
-                                  fontWeight: FontWeight.w700,
+                      GestureDetector(
+                        onTap: () {
+                          if (!_isLoadingUser) {
+                            showUserProfilePopup(
+                              context,
+                              userId: widget.comment.userId,
+                              userName: userName,
+                            );
+                          }
+                        },
+                        child: CircleAvatar(
+                          radius: 16,
+                          backgroundColor: AppColors.lightTextTertiary.withOpacity(0.1),
+                          child: _isLoadingUser
+                              ? const SizedBox(
+                                  width: 12,
+                                  height: 12,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : Text(
+                                  initials,
+                                  style: widget.theme.textTheme.labelLarge?.copyWith(
+                                    color: AppColors.lightTextTertiary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
-                              ),
+                        ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -1000,12 +1030,23 @@ class _CommentCardState extends State<_CommentCard> {
                           children: [
                             Row(
                               children: [
-                                Text(
-                                  _isLoadingUser ? 'Loading...' : userName,
-                                  style: widget.theme.textTheme.bodyMedium?.copyWith(
-                                    color: AppColors.lightTextPrimary,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 13,
+                                GestureDetector(
+                                  onTap: () {
+                                    if (!_isLoadingUser) {
+                                      showUserProfilePopup(
+                                        context,
+                                        userId: widget.comment.userId,
+                                        userName: userName,
+                                      );
+                                    }
+                                  },
+                                  child: Text(
+                                    _isLoadingUser ? 'Loading...' : userName,
+                                    style: widget.theme.textTheme.bodyMedium?.copyWith(
+                                      color: AppColors.lightTextPrimary,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: 8),
