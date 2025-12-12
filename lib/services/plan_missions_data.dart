@@ -764,6 +764,8 @@ List<PlanMission> getAllPlanMissions() {
       reflectionQuestions: [
         'What does reaching 50 smoke-free days mean to you?',
       ],
+      isMilestone: true,
+      badgeId: 'milestone_50_days',
     ),
     PlanMission(
       id: _dayId(51),
@@ -1198,6 +1200,8 @@ List<PlanMission> getAllPlanMissions() {
       reflectionQuestions: [
         'What does reaching 80 days smoke-free mean to you personally?',
       ],
+      isMilestone: true,
+      badgeId: 'milestone_80_days',
     ),
     PlanMission(
       id: _dayId(81),

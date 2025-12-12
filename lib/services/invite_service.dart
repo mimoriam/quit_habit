@@ -287,7 +287,9 @@ class InviteService {
                if (badgeId == 'phase_1_awareness') { name = 'Awareness Master'; icon = 'images/icons/home_meditate.png'; }
                else if (badgeId == 'phase_2_detox') { name = 'Detox Champion'; icon = 'images/icons/home_breathing.png'; }
                else if (badgeId == 'phase_3_rewiring') { name = 'Rewiring Expert'; icon = 'images/icons/home_electro.png'; }
+               else if (badgeId == 'milestone_50_days') { name = '50-Day Warrior'; icon = 'images/icons/header_shield.png'; }
                else if (badgeId == 'phase_4_mastery') { name = 'Freedom Master'; icon = 'images/icons/home_trophy.png'; }
+               else if (badgeId == 'milestone_80_days') { name = '80-Day Legend'; icon = 'images/icons/header_diamond.png'; }
                
                planBadgeData = {
                  'badgeName': name,

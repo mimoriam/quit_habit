@@ -227,6 +227,10 @@ class PlanService {
         return 'Rewiring Expert';
       case 'phase_4_mastery':
         return 'Freedom Master';
+      case 'milestone_50_days':
+        return '50-Day Warrior';
+      case 'milestone_80_days':
+        return '80-Day Legend';
       default:
         return 'Plan Badge';
     }
@@ -244,6 +248,10 @@ class PlanService {
         return 'images/icons/home_electro.png'; // Electro for rewiring
       case 'phase_4_mastery':
         return 'images/icons/home_trophy.png'; // Trophy for mastery
+      case 'milestone_50_days':
+        return 'images/icons/header_shield.png';
+      case 'milestone_80_days':
+        return 'images/icons/header_diamond.png';
       default:
         return 'images/icons/pro_crown.png';
     }

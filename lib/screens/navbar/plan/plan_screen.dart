@@ -101,6 +101,26 @@ class _PlanScreenState extends State<PlanScreen> {
       iconColor: AppColors.planRecoveryIcon,
       iconBgColor: AppColors.white,
     ),
+    _PlanPhaseData(
+      startDay: 22,
+      title: 'Rewiring Phase',
+      subtitle: 'Build new neural pathways',
+      dateRange: 'Days 22-66',
+      icon: Icons.psychology_alt_rounded,
+      bgColor: AppColors.planTransformationBg,
+      iconColor: AppColors.planTransformationIcon,
+      iconBgColor: AppColors.white,
+    ),
+    _PlanPhaseData(
+      startDay: 67,
+      title: 'Mastery Phase',
+      subtitle: 'Live free forever',
+      dateRange: 'Days 67-90',
+      icon: Icons.diamond_outlined,
+      bgColor: AppColors.planMasteryBg,
+      iconColor: AppColors.planMasteryIcon,
+      iconBgColor: AppColors.white,
+    ),
   ];
 
   Future<void> _reseedPlanMissions() async {
