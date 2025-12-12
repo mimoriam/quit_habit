@@ -8,12 +8,14 @@ import 'package:quit_habit/utils/app_theme.dart';
 import 'package:quit_habit/widgets/auth_gate.dart';
 
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:flutter_gemini/flutter_gemini.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  Gemini.init(apiKey: 'AIzaSyCWTlL7wv6tIFUapTTzzxinu3hxR6CJLzA');
   await MobileAds.instance.initialize();
   
   // Add test device ID as per logs

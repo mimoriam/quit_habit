@@ -48,6 +48,11 @@ class UserService {
     }
   }
 
+  /// Get user stream
+  Stream<DocumentSnapshot> getUserStream(String uid) {
+    return _usersCollection.doc(uid).snapshots();
+  }
+
   /// Check if user has completed questionnaire
   Future<bool> hasCompletedQuestionnaire(String uid) async {
     try {
