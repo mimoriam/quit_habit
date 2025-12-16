@@ -5,6 +5,7 @@ import 'package:quit_habit/models/goal.dart';
 import 'package:quit_habit/models/user_goal.dart';
 import 'package:quit_habit/services/goal_service.dart';
 import 'package:quit_habit/services/plan_service.dart';
+import 'package:quit_habit/services/ads_service.dart';
 import 'package:quit_habit/utils/app_colors.dart';
 import 'package:quit_habit/providers/auth_provider.dart';
 
@@ -64,6 +65,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
   Widget _buildHeader(ThemeData theme) {
     final authProvider = Provider.of<AuthProvider>(context);
     final user = authProvider.user;
+    final adsService = AdsService();
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -92,6 +94,76 @@ class _GoalsScreenState extends State<GoalsScreen> {
         ),
         Row(
           children: [
+            // Coins Badge with Ad
+            if (user != null) ...[
+              StreamBuilder<int>(
+                stream: adsService.getCoinsStream(user.uid),
+                initialData: 0,
+                builder: (context, snapshot) {
+                  final coins = snapshot.data ?? 0;
+                  return GestureDetector(
+                    onTap: () async {
+                      debugPrint('Ad coin tapped');
+                      try {
+                        final newCoins = await adsService.showRewardedAd(user.uid);
+                        if (context.mounted) {
+                          if (newCoins != null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('You earned 10 coins! Total: $newCoins'),
+                                backgroundColor: AppColors.lightSuccess,
+                              ),
+                            );
+                          } else {
+                             // Ad closed without reward or failed to show gracefully
+                             debugPrint('Ad returned null coins');
+                             ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('No reward earned.'),
+                                  backgroundColor: AppColors.lightTextSecondary,
+                                  duration: Duration(seconds: 1),
+                                ),
+                             );
+                          }
+                        }
+                      } catch (e) {
+                        debugPrint('Error showing ad: $e');
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(e.toString()),
+                              backgroundColor: AppColors.lightError,
+                            ),
+                          );
+                        }
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                      decoration: BoxDecoration(
+                        color: AppColors.badgeOrange,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        children: [
+                          Image.asset("images/icons/header_coin.png", width: 18, height: 18,),
+                          const SizedBox(width: 4),
+                          Text(
+                            '$coins',
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: AppColors.lightWarning,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(width: 8),
+            ],
+
             // Dynamic Pro badge matching other navbar screens
             if (user != null)
               StreamBuilder<({bool isPro, bool hasStarted, DateTime? planStartedAt})>(

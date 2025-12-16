@@ -20,6 +20,9 @@ import 'package:quit_habit/utils/app_colors.dart';
 import 'package:quit_habit/widgets/auth_gate.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:io';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -35,6 +38,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Map<String, dynamic>? _userData;
   bool _isLoadingUserData = false;
   bool _isSigningOut = false;
+  bool _isUploadingImage = false;
 
   @override
   void initState() {
@@ -65,6 +69,66 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (mounted) {
         setState(() {
           _isLoadingUserData = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _pickAndUploadImage() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final user = authProvider.user;
+
+    if (user == null) return;
+
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+
+    if (pickedFile == null) return;
+
+    setState(() {
+      _isUploadingImage = true;
+    });
+
+    try {
+      final file = File(pickedFile.path);
+      final ref = FirebaseStorage.instanceFor(bucket: 'gs://quitsmoking-3b99a.firebasestorage.app')
+          .ref()
+          .child('profile_images')
+          .child('${user.uid}.jpg');
+
+      await ref.putFile(file);
+      final downloadUrl = await ref.getDownloadURL();
+
+      // Update Firebase Auth
+      await user.updatePhotoURL(downloadUrl);
+
+      // Update Firestore
+      await _userService.updateUserProfileImage(user.uid, downloadUrl);
+
+      // Update local state
+      setState(() {
+        if (_userData != null) {
+          _userData!['photoUrl'] = downloadUrl;
+        } else {
+          _userData = {'photoUrl': downloadUrl};
+        }
+      });
+      
+      if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile image updated successfully!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to upload image: ${e.toString()}')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingImage = false;
         });
       }
     }
@@ -216,36 +280,67 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ],
                       ),
                       borderRadius: BorderRadius.circular(20),
+                      image: _userData != null && _userData!['photoUrl'] != null
+                          ? DecorationImage(
+                              image: NetworkImage(_userData!['photoUrl']),
+                              fit: BoxFit.cover,
+                            )
+                          : (Provider.of<AuthProvider>(context).user?.photoURL != null
+                              ? DecorationImage(
+                                  image: NetworkImage(
+                                      Provider.of<AuthProvider>(context)
+                                          .user!
+                                          .photoURL!),
+                                  fit: BoxFit.cover,
+                                )
+                              : null),
                     ),
-                    child: const Icon(
-                      Icons.person_outline_rounded,
-                      color: AppColors.white,
-                      size: 36,
-                    ),
+                    child: _isUploadingImage
+                        ? const Center(
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : (_userData != null &&
+                                    _userData!['photoUrl'] != null) ||
+                                (Provider.of<AuthProvider>(context)
+                                        .user
+                                        ?.photoURL !=
+                                    null)
+                            ? null
+                            : const Icon(
+                                Icons.person_outline_rounded,
+                                color: AppColors.white,
+                                size: 36,
+                              ),
                   ),
                   Positioned(
                     bottom: -4,
                     right: -4,
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: AppColors.white,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: AppColors.lightBackground,
-                          width: 2,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 4,
+                    child: GestureDetector(
+                      onTap: _pickAndUploadImage,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: AppColors.white,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.lightBackground,
+                            width: 2,
                           ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.edit,
-                        size: 12,
-                        color: AppColors.lightTextSecondary,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 4,
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.edit,
+                          size: 12,
+                          color: AppColors.lightTextSecondary,
+                        ),
                       ),
                     ),
                   ),

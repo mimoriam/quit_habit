@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:quit_habit/providers/auth_provider.dart';
 import 'package:quit_habit/services/habit_service.dart';
 import 'package:quit_habit/services/plan_service.dart';
+import 'package:quit_habit/services/ads_service.dart';
 import 'package:quit_habit/utils/app_colors.dart';
 
 class CommonHeader extends StatelessWidget {
@@ -14,6 +15,7 @@ class CommonHeader extends StatelessWidget {
     final authProvider = Provider.of<AuthProvider>(context);
     final user = authProvider.user;
     final habitService = HabitService();
+    final adsService = AdsService();
 
     // This is the _buildHeader implementation from home_screen.dart
     return Row(
@@ -45,7 +47,7 @@ class CommonHeader extends StatelessWidget {
                 return _buildStatBadge(
                   theme,
                   image: "images/icons/header_shield.png",
-                  label: '${successRate.toStringAsFixed(1)}%',
+                  label: '${successRate.toStringAsFixed(successRate.truncateToDouble() == successRate ? 0 : 1)}%',
                   bgColor: AppColors.badgeGreen,
                   iconColor: AppColors.lightSuccess,
                   textColor: AppColors.lightSuccess,
@@ -55,14 +57,70 @@ class CommonHeader extends StatelessWidget {
           },
         ),
         const SizedBox(width: 8),
-        _buildStatBadge(
-          theme,
-          image: "images/icons/header_coin.png",
-          label: '0',
-          bgColor: AppColors.badgeOrange,
-          iconColor: AppColors.lightWarning,
-          textColor: AppColors.lightWarning,
-        ),
+        // Coins Badge with Ad
+        if (user != null)
+          StreamBuilder<int>(
+            stream: adsService.getCoinsStream(user.uid),
+            initialData: 0,
+            builder: (context, snapshot) {
+              final coins = snapshot.data ?? 0;
+              return GestureDetector(
+                onTap: () async {
+                  debugPrint('Ad coin tapped');
+                  try {
+                    final newCoins = await adsService.showRewardedAd(user.uid);
+                    if (context.mounted) {
+                      if (newCoins != null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('You earned 10 coins! Total: $newCoins'),
+                            backgroundColor: AppColors.lightSuccess,
+                          ),
+                        );
+                      } else {
+                         // Ad closed without reward or failed to show gracefully
+                         debugPrint('Ad returned null coins');
+                         ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('No reward earned.'),
+                              backgroundColor: AppColors.lightTextSecondary,
+                              duration: Duration(seconds: 1),
+                            ),
+                         );
+                      }
+                    }
+                  } catch (e) {
+                    debugPrint('Error showing ad: $e');
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(e.toString()),
+                          backgroundColor: AppColors.lightError,
+                        ),
+                      );
+                    }
+                  }
+                },
+                child: _buildStatBadge(
+                  theme,
+                  image: "images/icons/header_coin.png",
+                  label: '$coins',
+                  bgColor: AppColors.badgeOrange,
+                  iconColor: AppColors.lightWarning,
+                  textColor: AppColors.lightWarning,
+                ),
+              );
+            },
+          )
+        else
+          _buildStatBadge(
+            theme,
+            image: "images/icons/header_coin.png",
+            label: '0',
+            bgColor: AppColors.badgeOrange,
+            iconColor: AppColors.lightWarning,
+            textColor: AppColors.lightWarning,
+          ),
         const Spacer(),
         // Pro Badge - only shown for Pro users
         if (user != null)

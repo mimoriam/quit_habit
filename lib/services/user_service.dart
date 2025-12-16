@@ -125,5 +125,18 @@ class UserService {
       throw Exception('Failed to upgrade user to Pro: ${e.toString()}');
     }
   }
+
+
+  /// Update user profile image
+  Future<void> updateUserProfileImage(String uid, String imageUrl) async {
+    try {
+      await _usersCollection.doc(uid).update({
+        'photoUrl': imageUrl,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      throw Exception('Failed to update user profile image: ${e.toString()}');
+    }
+  }
 }
 
