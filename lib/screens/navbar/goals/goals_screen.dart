@@ -71,27 +71,30 @@ class _GoalsScreenState extends State<GoalsScreen> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Challenges',
-              style: theme.textTheme.displayMedium?.copyWith(
-                color: AppColors.lightTextPrimary,
-                fontWeight: FontWeight.w700,
-                fontSize: 28,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Challenges',
+                style: theme.textTheme.displayMedium?.copyWith(
+                  color: AppColors.lightTextPrimary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 28,
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Push your limits, earn rewards',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppColors.lightTextSecondary,
-                fontSize: 15,
+              const SizedBox(height: 4),
+              Text(
+                'Push your limits, earn rewards',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: AppColors.lightTextSecondary,
+                  fontSize: 15,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
+        const SizedBox(width: 12),
         Row(
           children: [
             // Coins Badge with Ad
