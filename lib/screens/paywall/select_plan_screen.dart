@@ -6,6 +6,7 @@ import 'package:quit_habit/utils/app_colors.dart';
 
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:quit_habit/services/subscription_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SelectPlanScreen extends StatefulWidget {
   const SelectPlanScreen({super.key});
@@ -39,7 +40,9 @@ class _SelectPlanScreenState extends State<SelectPlanScreen> {
       if (mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const SubscriptionStatusScreen()),
+          MaterialPageRoute(
+            builder: (context) => const SubscriptionStatusScreen(),
+          ),
         );
       }
     }
@@ -50,12 +53,12 @@ class _SelectPlanScreenState extends State<SelectPlanScreen> {
     final theme = Theme.of(context);
     final subService = context.watch<SubscriptionService>();
     final products = subService.products;
-    
+
     debugPrint('SelectPlanScreen: Building with ${products.length} products');
     for (var p in products) {
       debugPrint('SelectPlanScreen: Available ID: ${p.id}');
     }
-    
+
     // Find specific products
     ProductDetails? monthlyProduct;
     ProductDetails? lifetimeProduct;
@@ -135,7 +138,7 @@ class _SelectPlanScreenState extends State<SelectPlanScreen> {
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 20),
-                        
+
                         // Monthly Plan
                         if (monthlyProduct != null)
                           _buildPlanCard(
@@ -172,12 +175,18 @@ class _SelectPlanScreenState extends State<SelectPlanScreen> {
                               children: [
                                 Text(
                                   "Lifetime access currently unavailable",
-                                  style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.lightError),
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: AppColors.lightError,
+                                  ),
                                 ),
-                                if (subService.notFoundIDs.contains(SubscriptionService.idLifetime))
+                                if (subService.notFoundIDs.contains(
+                                  SubscriptionService.idLifetime,
+                                ))
                                   Text(
                                     "ID: ${SubscriptionService.idLifetime} not found in Play Store",
-                                    style: theme.textTheme.labelSmall?.copyWith(color: AppColors.lightTextSecondary),
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: AppColors.lightTextSecondary,
+                                    ),
                                   ),
                                 TextButton(
                                   onPressed: () => subService.fetchProducts(),
@@ -200,8 +209,14 @@ class _SelectPlanScreenState extends State<SelectPlanScreen> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        _buildFeatureItem(theme, "Personalized 90-day quit plan"),
-                        _buildFeatureItem(theme, "Daily progress tracking & insights"),
+                        _buildFeatureItem(
+                          theme,
+                          "Personalized 90-day quit plan",
+                        ),
+                        _buildFeatureItem(
+                          theme,
+                          "Daily progress tracking & insights",
+                        ),
                         _buildFeatureItem(theme, "Craving management tools"),
                         _buildFeatureItem(theme, "Health improvement timeline"),
                         _buildFeatureItem(theme, "Expert video guidance"),
@@ -224,7 +239,10 @@ class _SelectPlanScreenState extends State<SelectPlanScreen> {
                                 height: 48,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  border: Border.all(color: AppColors.lightSuccess, width: 1.5),
+                                  border: Border.all(
+                                    color: AppColors.lightSuccess,
+                                    width: 1.5,
+                                  ),
                                   color: AppColors.white,
                                 ),
                                 child: const Icon(
@@ -283,21 +301,28 @@ class _SelectPlanScreenState extends State<SelectPlanScreen> {
                           onPressed: (isLoading || _isBusy)
                               ? null
                               : () async {
-                                  final targetProduct = _selectedPlanIndex == 0 
-                                      ? monthlyProduct 
+                                  final targetProduct = _selectedPlanIndex == 0
+                                      ? monthlyProduct
                                       : lifetimeProduct;
-                                  
+
                                   if (targetProduct != null) {
                                     try {
                                       setState(() => _isBusy = true);
-                                      await subService.buyProduct(targetProduct);
+                                      await subService.buyProduct(
+                                        targetProduct,
+                                      );
                                     } catch (e) {
                                       debugPrint('Purchase error: $e');
                                       if (mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
                                           SnackBar(
-                                            content: const Text("Purchase failed. Please try again."),
-                                            backgroundColor: AppColors.lightError,
+                                            content: const Text(
+                                              "Purchase failed. Please try again.",
+                                            ),
+                                            backgroundColor:
+                                                AppColors.lightError,
                                           ),
                                         );
                                       }
@@ -308,7 +333,11 @@ class _SelectPlanScreenState extends State<SelectPlanScreen> {
                                     }
                                   } else {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text("Selected product is unavailable")),
+                                      const SnackBar(
+                                        content: Text(
+                                          "Selected product is unavailable",
+                                        ),
+                                      ),
                                     );
                                   }
                                 },
@@ -318,7 +347,9 @@ class _SelectPlanScreenState extends State<SelectPlanScreen> {
                                   height: 24,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2.5,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
                                   ),
                                 )
                               : Text(
@@ -330,42 +361,67 @@ class _SelectPlanScreenState extends State<SelectPlanScreen> {
                                 ),
                         ),
                       ),
-                      
-                      // iOS Specific links (Restore, Terms, Privacy)
-                      if (Platform.isIOS) ...[
-                        const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            _buildFooterLink(
-                              context, 
-                              "Restore", 
-                              onTap: () async {
-                                try {
-                                  setState(() => _isBusy = true);
-                                  await subService.restorePurchases();
-                                } catch (e) {
-                                  if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text("Restore failed.")),
-                                    );
-                                  }
-                                } finally {
-                                  if (mounted) setState(() => _isBusy = false);
+
+                      // Restore available for all
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _buildFooterLink(
+                            context,
+                            "Restore",
+                            onTap: () async {
+                              try {
+                                setState(() => _isBusy = true);
+                                await subService.restorePurchases();
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        "Restore process initiated. Check your access.",
+                                      ),
+                                    ),
+                                  );
                                 }
+                              } catch (e) {
+                                debugPrint("Restore error: $e");
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text("Restore failed."),
+                                    ),
+                                  );
+                                }
+                              } finally {
+                                if (mounted) setState(() => _isBusy = false);
                               }
+                            },
+                          ),
+                          if (Platform.isIOS) ...[
+                            _buildDivider(),
+                            _buildFooterLink(
+                              context,
+                              "Terms of Use",
+                              onTap: () async {
+                                final Uri url = Uri.parse(
+                                  'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/',
+                                );
+                                if (!await launchUrl(url)) {
+                                  debugPrint('Could not launch $url');
+                                }
+                              },
                             ),
-                            _buildDivider(),
-                            _buildFooterLink(context, "Terms of Use", onTap: () {
-                              // Use url_launcher or show a dialog
-                            }),
-                            _buildDivider(),
-                            _buildFooterLink(context, "Privacy Policy", onTap: () {
-                              // Use url_launcher or show a dialog
-                            }),
+                            // _buildDivider(),
+                            // _buildFooterLink(
+                            //   context,
+                            //   "Privacy Policy",
+                            //   onTap: () {
+                            //     // Use url_launcher or show a dialog
+                            //   },
+                            // ),
                           ],
-                        ),
-                      ],
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -407,7 +463,9 @@ class _SelectPlanScreenState extends State<SelectPlanScreen> {
               color: AppColors.white,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: isSelected ? AppColors.lightPrimary : AppColors.lightBorder,
+                color: isSelected
+                    ? AppColors.lightPrimary
+                    : AppColors.lightBorder,
                 width: isSelected ? 2 : 1,
               ),
               boxShadow: isSelected
@@ -497,7 +555,9 @@ class _SelectPlanScreenState extends State<SelectPlanScreen> {
                   height: 24,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: isSelected ? AppColors.lightPrimary : AppColors.white,
+                    color: isSelected
+                        ? AppColors.lightPrimary
+                        : AppColors.white,
                     border: Border.all(
                       color: isSelected
                           ? AppColors.lightPrimary
@@ -516,14 +576,17 @@ class _SelectPlanScreenState extends State<SelectPlanScreen> {
               ],
             ),
           ),
-          
+
           // Badge (Positioned on top right)
           if (badgeText != null)
             Positioned(
               top: -12,
               right: 20,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: badgeColor,
                   borderRadius: BorderRadius.circular(12),
@@ -568,7 +631,11 @@ class _SelectPlanScreenState extends State<SelectPlanScreen> {
     );
   }
 
-  Widget _buildFooterLink(BuildContext context, String title, {required VoidCallback onTap}) {
+  Widget _buildFooterLink(
+    BuildContext context,
+    String title, {
+    required VoidCallback onTap,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Text(
@@ -584,10 +651,7 @@ class _SelectPlanScreenState extends State<SelectPlanScreen> {
   Widget _buildDivider() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8.0),
-      child: Text(
-        "•",
-        style: TextStyle(color: AppColors.lightTextTertiary),
-      ),
+      child: Text("•", style: TextStyle(color: AppColors.lightTextTertiary)),
     );
   }
 }
