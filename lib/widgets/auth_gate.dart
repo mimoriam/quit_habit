@@ -6,13 +6,38 @@ import 'package:quit_habit/screens/auth/login/login_screen.dart';
 import 'package:quit_habit/screens/navbar/navbar.dart';
 import 'package:quit_habit/utils/app_colors.dart';
 
-class AuthGate extends StatelessWidget {
+import 'package:quit_habit/services/subscription_service.dart';
+
+class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
+
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  String? _lastUid;
 
   @override
   Widget build(BuildContext context) {
     return Consumer<AuthProvider>(
       builder: (context, authProvider, _) {
+        // Trigger subscription check when user becomes authenticated or changes
+        if (authProvider.isAuthenticated) {
+          if (authProvider.user?.uid != _lastUid) {
+            _lastUid = authProvider.user?.uid;
+            // Run check in next frame to avoid build context issues
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (context.mounted) {
+                context.read<SubscriptionService>().refreshStatus();
+              }
+            });
+          }
+        } else {
+          // Reset _lastUid when unauthenticated to allow refresh if same user logs back in
+          _lastUid = null;
+        }
+
         Widget currentScreen;
         String screenKey;
 

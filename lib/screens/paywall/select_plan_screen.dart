@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:quit_habit/providers/auth_provider.dart';
 import 'package:quit_habit/screens/navbar/profile/subscription_status/subscription_status_screen.dart';
-import 'package:quit_habit/services/goal_service.dart';
-import 'package:quit_habit/services/user_service.dart';
 import 'package:quit_habit/utils/app_colors.dart';
+
+import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:quit_habit/services/subscription_service.dart';
 
 class SelectPlanScreen extends StatefulWidget {
   const SelectPlanScreen({super.key});
@@ -14,19 +14,62 @@ class SelectPlanScreen extends StatefulWidget {
 }
 
 class _SelectPlanScreenState extends State<SelectPlanScreen> {
-  // Default to Yearly (Index 2) as per design
-  int _selectedPlanIndex = 2;
-  bool _isLoading = false;
+  // 0: Monthly, 1: Lifetime
+  int _selectedPlanIndex = 0;
+  late SubscriptionService _subService;
+  bool _isBusy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Listen for subscription entitlement to auto-redirect
+    _subService = context.read<SubscriptionService>();
+    _subService.addListener(_checkEntitlement);
+  }
+
+  @override
+  void dispose() {
+    _subService.removeListener(_checkEntitlement);
+    super.dispose();
+  }
+
+  void _checkEntitlement() {
+    if (_subService.isEntitled) {
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const SubscriptionStatusScreen()),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final subService = context.watch<SubscriptionService>();
+    final products = subService.products;
+    
+    debugPrint('SelectPlanScreen: Building with ${products.length} products');
+    for (var p in products) {
+      debugPrint('SelectPlanScreen: Available ID: ${p.id}');
+    }
+    
+    // Find specific products
+    ProductDetails? monthlyProduct;
+    ProductDetails? lifetimeProduct;
+
+    for (var p in products) {
+      if (p.id == SubscriptionService.idMonthly) monthlyProduct = p;
+      if (p.id == SubscriptionService.idLifetime) lifetimeProduct = p;
+    }
+
+    final bool isLoading = subService.isLoading;
 
     return Scaffold(
       backgroundColor: AppColors.lightBackground,
       body: Stack(
         children: [
-          // 1. Decorative Background Shape (Top Left)
           Positioned(
             top: -100,
             left: -100,
@@ -39,7 +82,6 @@ class _SelectPlanScreenState extends State<SelectPlanScreen> {
               ),
             ),
           ),
-
           SafeArea(
             child: Column(
               children: [
@@ -49,17 +91,15 @@ class _SelectPlanScreenState extends State<SelectPlanScreen> {
                     child: Column(
                       children: [
                         const SizedBox(height: 20),
-
-                        // 2. Crown Icon
                         Container(
                           width: 70,
                           height: 70,
                           decoration: const BoxDecoration(
                             shape: BoxShape.circle,
-                            color: AppColors.lightWarning, // Gold/Orange
+                            color: AppColors.lightWarning,
                             boxShadow: [
                               BoxShadow(
-                                color: Color(0x33F59E0B), // Orange shadow
+                                color: Color(0x33F59E0B),
                                 blurRadius: 20,
                                 offset: Offset(0, 10),
                               ),
@@ -74,10 +114,7 @@ class _SelectPlanScreenState extends State<SelectPlanScreen> {
                             ),
                           ),
                         ),
-
                         const SizedBox(height: 16),
-
-                        // 3. Title & Subtitle
                         Text(
                           "Choose Your Plan",
                           style: theme.textTheme.displayMedium?.copyWith(
@@ -96,45 +133,60 @@ class _SelectPlanScreenState extends State<SelectPlanScreen> {
                           ),
                           textAlign: TextAlign.center,
                         ),
+                        const SizedBox(height: 20),
+                        
+                        // Monthly Plan
+                        if (monthlyProduct != null)
+                          _buildPlanCard(
+                            theme,
+                            index: 0,
+                            title: "Monthly Plan",
+                            price: monthlyProduct.price,
+                            period: "per month",
+                            dailyPrice: "Recurring subscription",
+                            badgeText: "Most Popular",
+                            badgeColor: AppColors.lightSecondary,
+                          )
+                        else if (!isLoading)
+                          const Text("Monthly plan currently unavailable"),
+
+                        const SizedBox(height: 12),
+
+                        // Lifetime Plan
+                        if (lifetimeProduct != null)
+                          _buildPlanCard(
+                            theme,
+                            index: 1,
+                            title: "Lifetime Access",
+                            price: lifetimeProduct.price,
+                            period: "one-time",
+                            dailyPrice: "Full access forever",
+                            badgeText: "Best Value",
+                            badgeColor: AppColors.lightPrimary,
+                          )
+                        else if (!isLoading)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8.0),
+                            child: Column(
+                              children: [
+                                Text(
+                                  "Lifetime access currently unavailable",
+                                  style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.lightError),
+                                ),
+                                if (subService.notFoundIDs.contains(SubscriptionService.idLifetime))
+                                  Text(
+                                    "ID: ${SubscriptionService.idLifetime} not found in Play Store",
+                                    style: theme.textTheme.labelSmall?.copyWith(color: AppColors.lightTextSecondary),
+                                  ),
+                                TextButton(
+                                  onPressed: () => subService.fetchProducts(),
+                                  child: const Text("Tap to retry"),
+                                ),
+                              ],
+                            ),
+                          ),
 
                         const SizedBox(height: 20),
-
-                        // 4. Plan Options
-                        _buildPlanCard(
-                          theme,
-                          index: 0,
-                          title: "Weekly Plan",
-                          price: "\$4.99",
-                          period: "per week",
-                          dailyPrice: "\$0.71/day",
-                        ),
-                        const SizedBox(height: 12),
-                        _buildPlanCard(
-                          theme,
-                          index: 1,
-                          title: "Monthly Plan",
-                          price: "\$12.99",
-                          period: "per month",
-                          dailyPrice: "\$0.43/day",
-                          badgeText: "Most Popular",
-                          badgeColor: AppColors.lightSecondary, // Purple
-                        ),
-                        const SizedBox(height: 12),
-                        _buildPlanCard(
-                          theme,
-                          index: 2,
-                          title: "Yearly Plan",
-                          price: "\$49.99",
-                          period: "per year",
-                          dailyPrice: "\$0.14/day",
-                          badgeText: "Best Value",
-                          badgeColor: AppColors.lightPrimary, // Blue
-                          saveAmount: "Save \$209",
-                        ),
-
-                        const SizedBox(height: 20),
-
-                        // 5. Everything Included List
                         Align(
                           alignment: Alignment.centerLeft,
                           child: Text(
@@ -148,21 +200,17 @@ class _SelectPlanScreenState extends State<SelectPlanScreen> {
                         ),
                         const SizedBox(height: 12),
                         _buildFeatureItem(theme, "Personalized 90-day quit plan"),
-                        _buildFeatureItem(
-                            theme, "Daily progress tracking & insights"),
+                        _buildFeatureItem(theme, "Daily progress tracking & insights"),
                         _buildFeatureItem(theme, "Craving management tools"),
                         _buildFeatureItem(theme, "Health improvement timeline"),
                         _buildFeatureItem(theme, "Expert video guidance"),
                         _buildFeatureItem(theme, "Community support access"),
-
                         const SizedBox(height: 20),
-
-                        // 6. Savings Card
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF0FDF4), // Light green bg
+                            color: const Color(0xFFF0FDF4),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
                               color: AppColors.lightSuccess.withOpacity(0.3),
@@ -175,8 +223,7 @@ class _SelectPlanScreenState extends State<SelectPlanScreen> {
                                 height: 48,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  border: Border.all(
-                                      color: AppColors.lightSuccess, width: 1.5),
+                                  border: Border.all(color: AppColors.lightSuccess, width: 1.5),
                                   color: AppColors.white,
                                 ),
                                 child: const Icon(
@@ -190,7 +237,7 @@ class _SelectPlanScreenState extends State<SelectPlanScreen> {
                                 "Save your health and money",
                                 style: theme.textTheme.titleMedium?.copyWith(
                                   fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF064E3B), // Dark Green
+                                  color: const Color(0xFF064E3B),
                                   fontSize: 16,
                                 ),
                               ),
@@ -199,7 +246,7 @@ class _SelectPlanScreenState extends State<SelectPlanScreen> {
                                 "Average smoker spends ~\$2,500 per\nyear on cigarettes",
                                 textAlign: TextAlign.center,
                                 style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: const Color(0xFF065F46), // Medium Green
+                                  color: const Color(0xFF065F46),
                                   height: 1.5,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -207,14 +254,11 @@ class _SelectPlanScreenState extends State<SelectPlanScreen> {
                             ],
                           ),
                         ),
-
                         const SizedBox(height: 24),
                       ],
                     ),
                   ),
                 ),
-
-                // 7. Subscribe Button
                 Container(
                   padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
                   decoration: BoxDecoration(
@@ -232,76 +276,48 @@ class _SelectPlanScreenState extends State<SelectPlanScreen> {
                     width: double.infinity,
                     height: 56,
                     child: ElevatedButton(
-                      onPressed: _isLoading
+                      onPressed: (isLoading || _isBusy)
                           ? null
                           : () async {
-                              final authProvider = Provider.of<AuthProvider>(
-                                  context,
-                                  listen: false);
-                              final user = authProvider.user;
-
-                              if (user != null) {
-                                setState(() {
-                                  _isLoading = true;
-                                });
+                              final targetProduct = _selectedPlanIndex == 0 
+                                  ? monthlyProduct 
+                                  : lifetimeProduct;
+                              
+                              if (targetProduct != null) {
                                 try {
-                                  // 1. Upgrade User
-                                  await UserService().upgradeToPro(user.uid);
-
-                                  // Refresh user state to reflect pro status
-                                  await authProvider.refreshUser();
-
-                                  // 2. Check Goal
-                                  await GoalService().checkMilestoneGoals(
-                                      user.uid, 'pro_status');
-
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Welcome to Pro!'),
-                                        backgroundColor: AppColors.lightSuccess,
-                                      ),
-                                    );
-
-                                    // Navigate to Dashboard
-                                    Navigator.pushReplacement(
-                                      context,
-                                      MaterialPageRoute(
-                                          builder: (context) =>
-                                              const SubscriptionStatusScreen()),
-                                    );
-                                  }
+                                  setState(() => _isBusy = true);
+                                  await subService.buyProduct(targetProduct);
                                 } catch (e) {
-                                  if (context.mounted) {
+                                  debugPrint('Purchase error: $e');
+                                  if (mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
-                                        content:
-                                            Text('Failed to subscribe: $e'),
+                                        content: const Text("Purchase failed. Please try again."),
                                         backgroundColor: AppColors.lightError,
                                       ),
                                     );
                                   }
                                 } finally {
-                                  if (context.mounted) {
-                                    setState(() {
-                                      _isLoading = false;
-                                    });
+                                  if (mounted) {
+                                    setState(() => _isBusy = false);
                                   }
-                                }
+                                }                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text("Selected product is unavailable")),
+                                );
                               }
                             },
-                      child: _isLoading
+                      child: (isLoading || _isBusy)
                           ? const SizedBox(
                               width: 24,
                               height: 24,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2.5,
-                                valueColor:
-                                    AlwaysStoppedAnimation<Color>(Colors.white),
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                               ),
                             )
                           : Text(
-                              "Subscribe Your Plan",
+                              "Subscribe Now",
                               style: theme.textTheme.labelLarge?.copyWith(
                                 fontSize: 17,
                                 fontWeight: FontWeight.w600,
